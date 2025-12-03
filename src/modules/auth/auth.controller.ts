@@ -1,4 +1,11 @@
-import { Body, Controller, Post, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Res,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SigninDto } from './dto/signin.dto';
 import type { Response } from 'express';
@@ -14,6 +21,7 @@ export class AuthController {
   ) {}
 
   @Post('signin')
+  @HttpCode(HttpStatus.OK)
   async signIn(
     @Body() signinDto: SigninDto,
     @Res({
@@ -36,8 +44,9 @@ export class AuthController {
     return userWithoutPassword;
   }
 
-  @AuthAndRoleGuard(Role.ADMIN, Role.CAJERO, Role.MOZO)
   @Post('signout')
+  @AuthAndRoleGuard(Role.ADMIN, Role.CAJERO, Role.MOZO)
+  @HttpCode(HttpStatus.OK)
   signOut(@Res({ passthrough: true }) res: Response) {
     const isProduction = this.config.get<string>('NODE_ENV') === 'production';
 
