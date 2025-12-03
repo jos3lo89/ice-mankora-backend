@@ -65,6 +65,11 @@ enum SunatStatus {
   ANULADO // Comunicación de baja aceptada
 }
 
+enum CashRegisterStatus {
+  ABIERTA
+  CERRADA
+}
+
 // ==========================================
 // MÓDULO A: INFRAESTRUCTURA (PISOS Y USUARIOS)
 // ==========================================
@@ -345,11 +350,6 @@ model Sale {
 // ==========================================
 // MÓDULO E: CONTROL DE CAJA (ARQUEO Y GASTOS)
 // ==========================================
-
-enum CashRegisterStatus {
-  ABIERTA
-  CERRADA
-}
 
 model CashRegister {
   id     String @id @default(uuid())
