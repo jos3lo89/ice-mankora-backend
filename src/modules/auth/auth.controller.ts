@@ -32,7 +32,7 @@ export class AuthController {
     const { token, userWithoutPassword } =
       await this.authService.signIn(signinDto);
 
-    const isProduction = this.config.get<string>('NODE_ENV') === 'production';
+    const isProduction = this.config.get<string>('APP_ENV') === 'production';
 
     res.cookie('access_token', token, {
       httpOnly: true,
@@ -48,7 +48,7 @@ export class AuthController {
   @AuthAndRoleGuard(Role.ADMIN, Role.CAJERO, Role.MOZO)
   @HttpCode(HttpStatus.OK)
   signOut(@Res({ passthrough: true }) res: Response) {
-    const isProduction = this.config.get<string>('NODE_ENV') === 'production';
+    const isProduction = this.config.get<string>('APP_ENV') === 'production';
 
     res.clearCookie('access_token', {
       httpOnly: true,
