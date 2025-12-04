@@ -5,7 +5,8 @@ import {
 } from '@nestjs/common';
 import { UserActiveI } from 'src/common/interfaces/userActive.interface';
 import { PrismaService } from 'src/core/prisma/prisma.service';
-import { UpdateProductStockDto } from './dto/update-product-stock.dto';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductStockDailyDto } from './dto/update-product-stock.dto';
 
 @Injectable()
 export class CatalogService {
@@ -16,7 +17,7 @@ export class CatalogService {
    * Solo devuelve categorías que estén asociadas al menos a uno de los pisos
    * en user.allowedFloorIds.
    */
-  async findAllCategories(user: UserActiveI) {
+  async getCategories(user: UserActiveI) {
     if (!user.allowedFloorIds || user.allowedFloorIds.length === 0) {
       throw new BadRequestException(
         'El usuario no tiene pisos asignados. Contacte al administrador.',
@@ -37,6 +38,7 @@ export class CatalogService {
         name: 'asc',
       },
       include: {
+        children: true,
         floors: {
           select: {
             id: true,
@@ -54,7 +56,7 @@ export class CatalogService {
    * Lista productos visibles según los pisos permitidos del usuario.
    * Filtra por la relación Category -> floors.
    */
-  async findAllProducts(user: UserActiveI) {
+  async getProducts(user: UserActiveI) {
     if (!user.allowedFloorIds || user.allowedFloorIds.length === 0) {
       throw new BadRequestException(
         'El usuario no tiene pisos asignados. Contacte al administrador.',
@@ -91,10 +93,26 @@ export class CatalogService {
   }
 
   /**
+   * ADMIN: Crear un producto nuevo
+   */
+  async createProduct(createProductDto: CreateProductDto) {
+    const { variants, ...productData } = createProductDto;
+
+    return await this.prisma.product.create({
+      data: {
+        ...productData,
+        variants: {
+          create: variants, // Crea variantes en la misma transacción
+        },
+      },
+    });
+  }
+
+  /**
    * Actualiza el stockDaily de un producto.
    * Usado por ADMIN/CAJERO cuando “ya no hay X producto”.
    */
-  async updateProductStock(id: string, dto: UpdateProductStockDto) {
+  async updateDailyStock(id: string, dto: UpdateProductStockDailyDto) {
     try {
       const product = await this.prisma.product.update({
         where: { id },

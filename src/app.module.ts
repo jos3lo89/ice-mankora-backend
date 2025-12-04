@@ -8,6 +8,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { FloorsModule } from './modules/floors/floors.module';
+import { OrdersModule } from './modules/orders/orders.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { FloorsModule } from './modules/floors/floors.module';
     UsersModule,
     CatalogModule,
     FloorsModule,
+    OrdersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

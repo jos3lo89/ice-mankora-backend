@@ -241,7 +241,7 @@ model OrderItem {
   updatedAt DateTime @updatedAt
 
   // Detalles de variantes en texto simple para historial rápido
-  variantsDetail String? // Ej: "Sabor: Lúcuma, Adicional: Chispas"
+  variantsDetail Json? // Ej: "Sabor: Lúcuma, Adicional: Chispas"
 
   @@map("order_items")
 }
