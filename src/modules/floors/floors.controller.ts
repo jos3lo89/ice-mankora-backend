@@ -1,9 +1,10 @@
-import { Controller, Get } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { FloorsService } from './floors.service';
 import { AuthAndRoleGuard } from 'src/common/decorators/auth.decorator';
 import { Role } from 'src/common/enums/role.enum';
 import { ActiveUser } from 'src/common/decorators/activeUser.decorator';
 import type { UserActiveI } from 'src/common/interfaces/userActive.interface';
+import { CreateTableDto } from './dto/create-table.dto';
 
 @Controller('floors')
 export class FloorsController {
@@ -17,6 +18,12 @@ export class FloorsController {
   @AuthAndRoleGuard(Role.ADMIN, Role.CAJERO, Role.MOZO)
   @Get('tables')
   getFloorsWithTables(@ActiveUser() user: UserActiveI) {
-    return this.floorsService.findFloorsWithTables(user);
+    return this.floorsService.getFloorsWithTables(user);
+  }
+
+  @Post('tables')
+  @AuthAndRoleGuard(Role.ADMIN)
+  createTable(@Body() createTableDto: CreateTableDto) {
+    return this.floorsService.createTable(createTableDto);
   }
 }

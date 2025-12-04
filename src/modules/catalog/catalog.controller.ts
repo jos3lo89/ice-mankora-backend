@@ -1,10 +1,11 @@
-import { Body, Controller, Get, Param, Patch } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import { CatalogService } from './catalog.service';
 import { AuthAndRoleGuard } from 'src/common/decorators/auth.decorator';
 import { Role } from 'src/common/enums/role.enum';
 import { ActiveUser } from 'src/common/decorators/activeUser.decorator';
 import type { UserActiveI } from 'src/common/interfaces/userActive.interface';
-import { UpdateProductStockDto } from './dto/update-product-stock.dto';
+import { UpdateProductStockDailyDto } from './dto/update-product-stock.dto';
+import { CreateProductDto } from './dto/create-product.dto';
 
 @Controller('catalog')
 export class CatalogController {
@@ -18,7 +19,7 @@ export class CatalogController {
   @AuthAndRoleGuard(Role.ADMIN, Role.CAJERO, Role.MOZO)
   @Get('categories')
   findAllCategories(@ActiveUser() user: UserActiveI) {
-    return this.catalogService.findAllCategories(user);
+    return this.catalogService.getCategories(user);
   }
 
   /**
@@ -29,7 +30,13 @@ export class CatalogController {
   @AuthAndRoleGuard(Role.ADMIN, Role.CAJERO, Role.MOZO)
   @Get('products')
   findAllProducts(@ActiveUser() user: UserActiveI) {
-    return this.catalogService.findAllProducts(user);
+    return this.catalogService.getProducts(user);
+  }
+
+  @Post('products')
+  @AuthAndRoleGuard(Role.ADMIN)
+  createProduct(@Body() createProductDto: CreateProductDto) {
+    return this.catalogService.createProduct(createProductDto);
   }
 
   /**
@@ -39,10 +46,10 @@ export class CatalogController {
    */
   @AuthAndRoleGuard(Role.ADMIN, Role.CAJERO)
   @Patch('products/:id/stock')
-  updateProductStock(
+  updateDailyStock(
     @Param('id') id: string,
-    @Body() dto: UpdateProductStockDto,
+    @Body() dto: UpdateProductStockDailyDto,
   ) {
-    return this.catalogService.updateProductStock(id, dto);
+    return this.catalogService.updateDailyStock(id, dto);
   }
 }
