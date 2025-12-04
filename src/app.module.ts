@@ -6,6 +6,8 @@ import { ConfigModule } from '@nestjs/config';
 import { envValidationSchema } from './config/env.validation';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
+import { FloorsModule } from './modules/floors/floors.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { UsersModule } from './modules/users/users.module';
     }),
     AuthModule,
     UsersModule,
+    CatalogModule,
+    FloorsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
