@@ -9,6 +9,7 @@ import { UsersModule } from './modules/users/users.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { FloorsModule } from './modules/floors/floors.module';
 import { OrdersModule } from './modules/orders/orders.module';
+import { BillingModule } from './modules/billing/billing.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { OrdersModule } from './modules/orders/orders.module';
     CatalogModule,
     FloorsModule,
     OrdersModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
