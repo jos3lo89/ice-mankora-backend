@@ -80,10 +80,12 @@ export class CatalogService {
         name: 'asc',
       },
       include: {
+        variants: true,
         category: {
           select: {
             id: true,
             name: true,
+            slug: true,
           },
         },
       },
