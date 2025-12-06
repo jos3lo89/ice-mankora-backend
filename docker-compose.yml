@@ -1,14 +1,31 @@
 services:
-  backend:
+  app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: ice-mankora-api
-    restart: always
+      target: production
+      args:
+        DATABASE_URL: 'postgresql://dummy:dummy@dummy:5432/dummy?sslmode=require'
+    container_name: ice_mankora_app
+    restart: unless-stopped
     ports:
-      - '5000:5000'
+      - '${PORT}:${PORT}'
+    env_file:
+      - .env
     environment:
+      NODE_ENV: ${APP_ENV}
+      PORT: ${PORT}
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
-      PORT: 5000
-      APP_ENV: production
+    command: >
+      sh -c "
+        echo '1 -> Iniciando Ice Mankora Backend...' &&
+        echo '2 -> Aplicando migraciones...' &&
+        npx prisma migrate deploy &&
+        echo 'Migraciones aplicadas correctamente' &&
+        echo '3 -> Ejecutando seed de base de datos...' &&
+        npx prisma db seed &&
+        echo 'Seed ejecutado correctamente' &&
+        echo '4 -> Iniciando servidor NestJS en puerto ${PORT}...' &&
+        node dist/src/main.js
+      "
