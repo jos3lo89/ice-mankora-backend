@@ -16,6 +16,7 @@ COPY . .
 # ARG para DATABASE_URL dummy - prisma lo necesita en build time
 ARG DATABASE_URL="postgresql://dummy:dummy@dummy:5432/dummy?sslmode=require"
 ENV DATABASE_URL=$DATABASE_URL
+RUN npx prisma generate
 RUN npm run build
 RUN npm prune --production
 
