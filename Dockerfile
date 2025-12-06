@@ -1,31 +1,43 @@
-# Usamos Node 24 (Alpine)
-FROM node:24-alpine
+# ============================================
+# Paso 1: Dependencies
+# ============================================
+FROM node:22-alpine AS dependencies
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
 
-# Instalamos OpenSSL (Vital para Prisma)
-RUN apk add --no-cache openssl libc6-compat
+# ============================================
+# Paso 2: Build
+# ============================================
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY . .
+# ARG para DATABASE_URL dummy - prisma lo necesita en build time
+ARG DATABASE_URL="postgresql://dummy:dummy@dummy:5432/dummy?sslmode=require"
+ENV DATABASE_URL=$DATABASE_URL
+RUN npm run build
+RUN npm prune --production
+
+# ============================================
+# Paso 3: Production
+# ============================================
+FROM node:22-alpine AS production
+
+# Instalar openssl - requerido por Prisma
+RUN apk add --no-cache openssl
 
 WORKDIR /app
 
-# 1. Copiar package.json
-COPY package*.json ./
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/src/generated ./src/generated
+COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/prisma.config.ts ./prisma.config.ts
+COPY --from=build /app/package*.json ./
 
-# 2. Instalar dependencias (incluyendo 'tsx' y 'dev' para el build y el seed)
-RUN npm install
-
-# 3. Copiar TODO el proyecto (src, prisma, configs, etc.)
-COPY . .
-
-# 4. Generar Cliente Prisma (con variable dummy para el build)
-ARG DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
-RUN npx prisma generate
-
-# 5. Compilar el proyecto (Creará dist/src/main.js según tu foto)
-RUN npm run build
+RUN npm install -g tsx
 
 EXPOSE 5000
 
-# ========================================================
-# COMANDO FINAL CORREGIDO
-# ========================================================
-# Apuntamos a 'dist/src/main' en lugar de 'dist/main'
-CMD ["/bin/sh", "-c", "npx prisma migrate deploy && npx prisma db seed && node dist/src/main"]
+CMD ["node", "dist/src/main.js"]

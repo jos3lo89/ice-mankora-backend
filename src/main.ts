@@ -9,7 +9,8 @@ async function bootstrap() {
   app.use(cookieParser());
 
   app.enableCors({
-    origin: ['https://www.evilain.site', 'https://evilain.site'],
+    // origin: ['https://www.evilain.site', 'https://evilain.site'],
+    origin: true,
     credentials: true,
   });
 
