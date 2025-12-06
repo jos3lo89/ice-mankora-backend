@@ -1,0 +1,11 @@
+[phases.setup]
+nixPackages = ["nodejs_22", "nodejs_22_12", "openssl"]
+
+[phases.install]
+cmds = ["npm ci"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[phases.start]
+cmd = "npm run start"
