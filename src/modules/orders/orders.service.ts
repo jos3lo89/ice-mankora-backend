@@ -20,7 +20,7 @@ import { Decimal } from 'src/generated/prisma/internal/prismaNamespace';
 export class OrdersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /*  /**
+  /*
    * CREAR PEDIDO (ABRIR MESA)
    * 1. Valida que la mesa esté libre (o permita re-apertura).
    * 2. Verifica stock de cada producto.
@@ -365,5 +365,46 @@ export class OrdersService {
       include: { items: true, table: true },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /**
+   * BUSCAR ORDEN ACTIVA DE UNA MESA
+   * Usado para cargar el detalle de la mesa cuando está Ocupada/Roja.
+   */
+  async findActiveOrder(tableId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: {
+        tableId: tableId,
+        // Una orden activa es aquella que NO está cancelada y NO tiene venta asociada (no pagada)
+        status: { not: OrderStatus.CANCELADO },
+        sale: { is: null },
+      },
+      include: {
+        items: {
+          include: {
+            product: true, // Necesitamos nombre y precio del producto
+          },
+          orderBy: { createdAt: 'desc' }, // Lo último pedido sale arriba
+        },
+        table: true,
+        user: { select: { name: true } }, // Para saber qué mozo abrió la mesa
+      },
+    });
+
+    if (!order) {
+      // Si la mesa está roja en el mapa pero no devuelve orden aquí,
+      // significa que hubo un error de consistencia o ya se pagó.
+      // Retornamos null o lanzamos error según prefieras manejarlo en front.
+      throw new NotFoundException(
+        'No hay ninguna orden activa para esta mesa.',
+      );
+    }
+
+    // Calculamos el total al vuelo para facilitarle la vida al frontend
+    const total = order.items.reduce((acc, item) => {
+      return acc + Number(item.price) * item.quantity;
+    }, 0);
+
+    return { ...order, total };
   }
 }
