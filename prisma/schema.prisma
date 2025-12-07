@@ -243,6 +243,9 @@ model OrderItem {
   // Detalles de variantes en texto simple para historial rápido
   variantsDetail Json? // Ej: "Sabor: Lúcuma, Adicional: Chispas"
 
+  saleId String?
+  sale   Sale?   @relation(fields: [saleId], references: [id])
+
   @@map("order_items")
 }
 
@@ -341,8 +344,9 @@ model Sale {
   formaPago     String        @default("Contado")
   cuotas        Json? // Array de fechas si es Crédito
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  orderItems OrderItem[]
 
   @@map("sales")
 }

@@ -90,4 +90,10 @@ export class OrdersController {
   requestPreAccount(@Param('id', ParseUUIDPipe) id: string) {
     return this.ordersService.requestPreAccount(id);
   }
+
+  @Get('active/:tableId')
+  @AuthAndRoleGuard(Role.MOZO, Role.CAJERO, Role.ADMIN)
+  findActiveByTable(@Param('tableId', ParseUUIDPipe) tableId: string) {
+    return this.ordersService.findActiveOrder(tableId);
+  }
 }

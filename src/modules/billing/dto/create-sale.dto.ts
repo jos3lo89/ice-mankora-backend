@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsEnum,
   IsNotEmpty,
   IsOptional,
@@ -17,6 +18,11 @@ export class CreateSaleDto {
 
   @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod; // Efectivo, Tarjeta, etc.
+
+  // NUEVO: Lista de IDs de los items a cobrar (Pagos Parciales)
+  @IsArray()
+  @IsOptional() // Si no se envía, asumo que es todo
+  itemIds?: string[];
 
   // Datos del Cliente (Obligatorio si es Factura, Opcional si es Boleta < S/700)
   @IsString()
