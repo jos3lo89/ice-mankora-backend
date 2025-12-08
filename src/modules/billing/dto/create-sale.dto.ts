@@ -1,43 +1,54 @@
 import {
-  IsArray,
   IsEnum,
-  IsNotEmpty,
   IsOptional,
   IsString,
-  IsUUID,
+  IsArray,
+  IsNumber,
 } from 'class-validator';
 import { ComprobanteType, PaymentMethod } from 'src/generated/prisma/enums';
 
 export class CreateSaleDto {
-  @IsUUID()
-  @IsNotEmpty()
-  orderId: string; // ¿Qué pedido estamos cobrando?
+  @IsString()
+  orderId: string;
 
   @IsEnum(ComprobanteType)
-  type: ComprobanteType; // BOLETA o FACTURA
+  type: ComprobanteType;
 
   @IsEnum(PaymentMethod)
-  paymentMethod: PaymentMethod; // Efectivo, Tarjeta, etc.
+  paymentMethod: PaymentMethod;
 
-  // NUEVO: Lista de IDs de los items a cobrar (Pagos Parciales)
-  @IsArray()
-  @IsOptional() // Si no se envía, asumo que es todo
-  itemIds?: string[];
-
-  // Datos del Cliente (Obligatorio si es Factura, Opcional si es Boleta < S/700)
-  @IsString()
+  // ✅ Nuevo: Datos de pago
   @IsOptional()
-  clientDocType?: string; // "1" (DNI) o "6" (RUC)
+  @IsNumber()
+  montoPagado?: number;
 
-  @IsString()
   @IsOptional()
+  @IsNumber()
+  vuelto?: number;
+
+  // Cliente (obligatorio para Boleta/Factura)
+  @IsOptional()
+  @IsString()
+  clientDocType?: string; // "1" DNI, "6" RUC
+
+  @IsOptional()
+  @IsString()
   clientDocNumber?: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   clientName?: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   clientAddress?: string;
+
+  @IsOptional()
+  @IsString()
+  clientEmail?: string;
+
+  // División de cuenta (opcional)
+  @IsOptional()
+  @IsArray()
+  itemIds?: string[];
 }

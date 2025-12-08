@@ -9,23 +9,20 @@ import {
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import type { UserActiveI } from 'src/common/interfaces/userActive.interface';
-import { AddOrderItemDto } from './dto/add-order-item.dto';
 import { CancelOrderDto } from './dto/cancel-order.dto';
 import { OrderStatus, TableStatus } from 'src/generated/prisma/enums';
 import { AddItemsDto } from './dto/add-items.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { Decimal } from 'src/generated/prisma/internal/prismaNamespace';
+import { PrinterService } from '../printer/printer.service';
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private printerService: PrinterService,
+  ) {}
 
-  /*
-   * CREAR PEDIDO (ABRIR MESA)
-   * 1. Valida que la mesa esté libre (o permita re-apertura).
-   * 2. Verifica stock de cada producto.
-   * 3. Crea Orden, Detalle, Descuenta Stock y Ocupa Mesa en UNA sola transacción.
-   */
   async create(createOrderDto: CreateOrderDto, user: UserActiveI) {
     const table = await this.prisma.table.findUnique({
       where: {
@@ -33,24 +30,25 @@ export class OrdersService {
       },
     });
 
-    if (!table) throw new NotFoundException('Mesa no encontrada');
-
-    if (table.status === TableStatus.OCUPADA) {
-      throw new BadRequestException(
-        'La mesa ya está ocupada. Usa "Agregar Items" en su lugar.',
-      );
+    if (!table) {
+      throw new NotFoundException('Mesa no encontrada');
     }
 
-    // INICIO DE TRANSACCIÓN
+    if (table.status === TableStatus.OCUPADA) {
+      throw new BadRequestException('Mesa ocupada');
+    }
+
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        // 1. Validar y descontar stock uno por uno
-        // Calculamos total solo referencial (el verdadero cálculo es en Caja)
+      const result = await this.prisma.$transaction(async (tx) => {
+        const dailyNumber = await this.getNextDailyOrderNumber(
+          tx,
+          table.floorId,
+        );
 
         const orderItemsData: {
           productId: string;
           quantity: number;
-          price: Decimal; // 'any' o 'Decimal' para aceptar el tipo de dato de Prisma
+          price: Decimal;
           notes?: string;
           variantsDetail?: string;
         }[] = [];
@@ -60,54 +58,108 @@ export class OrdersService {
             where: { id: item.productId },
           });
 
-          if (!product)
-            throw new NotFoundException(
-              `Producto ${item.productId} no encontrado`,
-            );
-          if (!product.isActive)
-            throw new BadRequestException(
-              `El producto ${product.name} no está activo`,
-            );
-
-          // Validación de Stock Diario (Mise en place)
-          if (product.isStockManaged && product.stockDaily < item.quantity) {
-            throw new BadRequestException(
-              `Stock insuficiente para ${product.name}. Quedan: ${product.stockDaily}`,
-            );
+          if (!product || !product.isActive) {
+            throw new BadRequestException(`Producto inválido`);
           }
 
-          // Descuento de Stock
+          let finalPrice = Number(product.price);
+          let variantsDescriptionArray: string[] = [];
+
+          if (item.variantIds && item.variantIds.length > 0) {
+            const variants = await tx.productVariant.findMany({
+              where: {
+                id: { in: item.variantIds },
+                productId: product.id,
+              },
+            });
+
+            for (const v of variants) {
+              finalPrice += Number(v.priceExtra);
+              variantsDescriptionArray.push(v.name);
+            }
+          }
+
           if (product.isStockManaged) {
+            if (product.stockDaily < item.quantity) {
+              throw new BadRequestException(
+                `Stock insuficiente: ${product.name}`,
+              );
+            }
             await tx.product.update({
               where: { id: product.id },
               data: { stockDaily: { decrement: item.quantity } },
             });
           }
 
-          // Preparamos datos del item (snapshot del precio)
           orderItemsData.push({
             productId: product.id,
             quantity: item.quantity,
-            price: product.price, // ¡IMPORTANTE! Precio congelado al momento de pedir
+            price: new Decimal(finalPrice),
             notes: item.notes,
-            variantsDetail: item.variantsDetail,
+            variantsDetail: variantsDescriptionArray.join(', '),
           });
         }
 
-        // 2. Crear la Orden
+        // const startOfToday = new Date();
+        // startOfToday.setHours(0, 0, 0, 0);
+
+        // const endOfToday = new Date();
+        // endOfToday.setHours(23, 59, 59, 999);
+
+        // const lastOrderToday = await tx.order.findFirst({
+        //   where: {
+        //     orderDate: {
+        //       gte: startOfToday,
+        //       lte: endOfToday,
+        //     },
+        //     table: {
+        //       floorId: table.floorId,
+        //     },
+        //   },
+        //   orderBy: {
+        //     dailyNumber: 'desc',
+        //   },
+        //   select: {
+        //     dailyNumber: true,
+        //   },
+        // });
+
+        // const nextDailyNumber = (lastOrderToday?.dailyNumber ?? 0) + 1;
+
+        // ✅ NUEVO: Crear orden con número del día
+        const orderDate = new Date();
+        orderDate.setHours(0, 0, 0, 0); // Solo fecha, sin hora
+
         const newOrder = await tx.order.create({
           data: {
             tableId: createOrderDto.tableId,
             userId: user.userId,
             status: OrderStatus.PENDIENTE,
+            dailyNumber,
+            orderDate,
             items: {
               create: orderItemsData,
             },
           },
-          include: { items: { include: { product: true } }, table: true },
+          include: {
+            items: {
+              include: {
+                product: {
+                  include: {
+                    variants: true,
+                  },
+                },
+              },
+            },
+            table: {
+              include: {
+                floor: true,
+              },
+            },
+            user: true,
+          },
         });
 
-        // 3. Actualizar estado de la Mesa
         await tx.table.update({
           where: { id: createOrderDto.tableId },
           data: { status: TableStatus.OCUPADA },
@@ -115,81 +167,75 @@ export class OrdersService {
 
         return newOrder;
       });
+
+      // ✅ NUEVO: Imprimir comanda automáticamente después de crear la orden
+      await this.printerService.printOrderComanda(result.id);
+
+      console.log(JSON.stringify(result));
+
+      return result;
     } catch (error) {
       console.log('Error al crear el pedido', error);
       throw new InternalServerErrorException('Error al crear el pedido');
     }
   }
 
-  /**
-   * Agregar ítems a una orden abierta
-   */
-  async addItems(orderId: string, user: UserActiveI, items: AddOrderItemDto[]) {
+  // ✅ NUEVO: Obtener el próximo número de orden del día para el piso
+  private async getNextDailyOrderNumber(
+    tx: any,
+    floorId: string,
+  ): Promise<number> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Obtener la última orden del día en ese piso
+    const lastOrder = await tx.order.findFirst({
+      where: {
+        table: {
+          floorId,
+        },
+        orderDate: {
+          gte: today,
+          lt: tomorrow,
+        },
+      },
+      orderBy: {
+        dailyNumber: 'desc',
+      },
+    });
+
+    return lastOrder ? lastOrder.dailyNumber + 1 : 1;
+  }
+
+  // ✅ NUEVO: Endpoint para obtener logs de impresión
+  async getOrderPrintLogs(orderId: string) {
+    return this.printerService.getPrintLogs(orderId);
+  }
+
+  // ✅ NUEVO: Endpoint para reintentar impresión
+  async retryPrint(printLogId: string) {
+    return this.printerService.retryPrint(printLogId);
+  }
+
+  async addItems(orderId: string, addItemsDto: AddItemsDto, user: UserActiveI) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { table: true },
     });
 
-    if (!order) throw new NotFoundException('Pedido no encontrado.');
-
-    if (!user.allowedFloorIds.includes(order.table.floorId))
-      throw new ForbiddenException('No tienes acceso.');
-
-    if (order.status === OrderStatus.CANCELADO)
-      throw new ConflictException('El pedido fue cancelado.');
-
-    // Validar stock
-    for (const item of items) {
-      const product = await this.prisma.product.findUnique({
-        where: { id: item.productId },
-      });
-
-      if (!product) throw new NotFoundException('Producto no existe.');
-
-      if (product.isStockManaged && product.stockDaily < item.quantity)
-        throw new ConflictException(`No hay stock para ${product.name}.`);
+    if (!order) {
+      throw new NotFoundException('Pedido no encontrado');
     }
 
-    return this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        items: {
-          create: items.map((i) => ({
-            productId: i.productId,
-            quantity: i.quantity,
-            notes: i.notes,
-            variantsDetail: i.variantsDetail,
-            price: 0,
-          })),
-        },
-      },
-      include: { items: true },
-    });
-  }
-
-  /**
-   * AGREGAR ITEMS A MESA YA ABIERTA
-   * (Ej: "Tráeme dos cervezas más")
-   */
-  async addItems2(
-    orderId: string,
-    addItemsDto: AddItemsDto,
-    user: UserActiveI,
-  ) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        table: true,
-      },
-    });
-
-    if (!order) throw new NotFoundException('Pedido no encontrado');
-
-    if (order.status === OrderStatus.CANCELADO)
+    if (order.status === OrderStatus.CANCELADO) {
       throw new BadRequestException('El pedido está cancelado');
+    }
 
     if (!user.allowedFloorIds.includes(order.table.floorId)) {
-      throw new ForbiddenException('No tienes acceso.');
+      throw new ForbiddenException('No tienes acceso');
     }
 
     return await this.prisma.$transaction(async (tx) => {
@@ -199,16 +245,33 @@ export class OrdersService {
         });
 
         if (!product || !product.isActive) {
-          throw new BadRequestException(`Producto inválido: ${item.productId}`);
+          throw new BadRequestException('Producto inválido');
         }
 
-        if (product.isStockManaged && product.stockDaily < item.quantity) {
-          throw new BadRequestException(
-            `Stock insuficiente para ${product.name}`,
-          );
+        let finalPrice = Number(product.price);
+        let variantsDescriptionArray: string[] = [];
+
+        if (item.variantIds && item.variantIds.length > 0) {
+          const variants = await tx.productVariant.findMany({
+            where: {
+              id: { in: item.variantIds },
+              productId: product.id,
+            },
+          });
+
+          for (const v of variants) {
+            finalPrice += Number(v.priceExtra);
+            variantsDescriptionArray.push(v.name);
+          }
         }
 
         if (product.isStockManaged) {
+          if (product.stockDaily < item.quantity) {
+            throw new BadRequestException(
+              `Stock insuficiente para ${product.name}`,
+            );
+          }
+
           await tx.product.update({
             where: { id: product.id },
             data: { stockDaily: { decrement: item.quantity } },
@@ -220,9 +283,9 @@ export class OrdersService {
             orderId: order.id,
             productId: product.id,
             quantity: item.quantity,
-            price: product.price,
+            price: new Decimal(finalPrice),
             notes: item.notes,
-            variantsDetail: item.variantsDetail,
+            variantsDetail: variantsDescriptionArray.join(', '),
           },
         });
       }
@@ -239,7 +302,11 @@ export class OrdersService {
   /**
    * Cancelar un pedido completo
    */
-  async cancelOrder(orderId: string, user: UserActiveI, dto: CancelOrderDto) {
+  async cancelOrderFirst(
+    orderId: string,
+    user: UserActiveI,
+    dto: CancelOrderDto,
+  ) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { table: true },
@@ -333,8 +400,25 @@ export class OrdersService {
     return await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
         where: { id: orderId },
-        include: { items: true, table: true },
+        include: {
+          items: {
+            include: {
+              product: {
+                include: {
+                  category: true,
+                },
+              },
+            },
+          },
+          table: {
+            include: {
+              floor: true,
+            },
+          },
+          user: true,
+        },
       });
+
       if (!order) throw new NotFoundException('Pedido no encontrado');
 
       // Cambiar estado de mesa a "PIDIENDO CUENTA" (Amarillo)
@@ -343,15 +427,39 @@ export class OrdersService {
         data: { status: TableStatus.PIDIENDO_CUENTA },
       });
 
-      // Calcular total simple
+      // Calcular total
       const total = order.items.reduce((acc, item) => {
         return acc + Number(item.price) * item.quantity;
       }, 0);
 
+      // ✅ NUEVO: Imprimir ticket de pre-cuenta
+      await this.printerService.printPreCuenta({
+        orderId: order.id,
+        dailyNumber: order.dailyNumber,
+        tableNumber: order.table.number.toString(),
+        tableName: order.table.name,
+        floorId: order.table.floor.id,
+        floorName: order.table.floor.name,
+        floorLevel: order.table.floor.level,
+        items: order.items.map((item) => ({
+          name: item.product.name,
+          quantity: item.quantity,
+          price: Number(item.price),
+          notes: item.notes,
+          variantsDetail: item.variantsDetail as string,
+          categoryName: item.product.category.name,
+        })),
+        waiter: order.user.name,
+        total,
+        subtotal: total / 1.18,
+        igv: total - total / 1.18,
+        timestamp: new Date(),
+      });
+
       return {
         ...order,
         calculatedTotal: total,
-        message: 'Pre-cuenta generada. Mesa en estado de pago.',
+        message: 'Pre-cuenta generada e impresa. Mesa en estado de pago.',
       };
     });
   }
@@ -362,7 +470,14 @@ export class OrdersService {
   async findMyOrders(user: UserActiveI) {
     return this.prisma.order.findMany({
       where: { userId: user.userId },
-      include: { items: true, table: true },
+      include: {
+        items: true,
+        table: {
+          include: {
+            floor: true,
+          },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -386,7 +501,11 @@ export class OrdersService {
           },
           orderBy: { createdAt: 'desc' }, // Lo último pedido sale arriba
         },
-        table: true,
+        table: {
+          include: {
+            floor: true,
+          },
+        },
         user: { select: { name: true } }, // Para saber qué mozo abrió la mesa
       },
     });
@@ -406,5 +525,60 @@ export class OrdersService {
     }, 0);
 
     return { ...order, total };
+  }
+
+  async cancelOrder(orderId: string, user: UserActiveI, dto: CancelOrderDto) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { table: true, sale: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Pedido no encontrado');
+    }
+
+    if (order.status === OrderStatus.CANCELADO) {
+      throw new BadRequestException('El pedido ya está cancelado');
+    }
+
+    if (order.sale) {
+      throw new BadRequestException(
+        'El pedido ya tiene una venta asociada, debe anular la venta en Caja.',
+      );
+    }
+
+    const configPin = await this.prisma.systemConfig.findUnique({
+      where: { key: 'ADMIN_PIN' },
+    });
+
+    if (!configPin) {
+      throw new NotFoundException('Código no encontrado');
+    }
+
+    if (dto.authCode !== configPin.value) {
+      throw new ForbiddenException('Código de autorización incorrecto');
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      await tx.orderCancellation.create({
+        data: {
+          orderId: orderId,
+          reason: dto.reason,
+          authorizedById: user.userId,
+        },
+      });
+
+      const cancelledOrder = await tx.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.CANCELADO },
+      });
+
+      await tx.table.update({
+        where: { id: order.tableId },
+        data: { status: TableStatus.LIBRE },
+      });
+
+      return cancelledOrder;
+    });
   }
 }

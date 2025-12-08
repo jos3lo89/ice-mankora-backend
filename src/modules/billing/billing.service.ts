@@ -29,6 +29,7 @@ export class BillingService {
         items: { include: { product: true } },
         table: true,
         sale: true,
+        user: true, // ✅ Para metadata
       },
     });
 
@@ -37,25 +38,54 @@ export class BillingService {
     if (order.status === OrderStatus.CANCELADO)
       throw new BadRequestException('El pedido está anulado.');
 
-    // 2. Validaciones SUNAT (Boleta vs Factura)
+    // 2. Validaciones por tipo de comprobante
     if (dto.type === ComprobanteType.FACTURA) {
-      if (dto.clientDocType !== '6')
-        throw new BadRequestException('Para Factura se requiere RUC (Tipo 6).');
-      if (!dto.clientDocNumber || dto.clientDocNumber.length !== 11)
-        throw new BadRequestException('RUC inválido.');
+      if (!dto.clientDocNumber || dto.clientDocNumber.length !== 11) {
+        throw new BadRequestException(
+          'Para Factura se requiere RUC de 11 dígitos.',
+        );
+      }
+      if (!dto.clientName) {
+        throw new BadRequestException('Falta la Razón Social para Factura.');
+      }
     }
 
-    // 3. Cálculos Matemáticos (Totales e Impuestos)
+    if (dto.type === ComprobanteType.BOLETA && dto.clientDocNumber) {
+      if (dto.clientDocNumber.length !== 8) {
+        throw new BadRequestException('El DNI debe tener 8 dígitos.');
+      }
+    }
+
+    // ✅ 3. Validar pago si es efectivo
+    if (dto.montoPagado !== undefined) {
+      const { total } = this.calculateTotals(order.items);
+      if (dto.montoPagado < Number(total)) {
+        throw new BadRequestException('El monto pagado es insuficiente.');
+      }
+    }
+
+    // 4. Cálculos Matemáticos (Totales e Impuestos)
     const { total, baseImponible, igvTotal, itemsSnapshot } =
       this.calculateTotals(order.items);
 
-    // 4. TRANSACCIÓN (Cobro + Correlativo + Cierre Mesa)
+    // 5. TRANSACCIÓN (Cobro + Correlativo + Cierre Mesa)
     return await this.prisma.$transaction(async (tx) => {
-      // A. Generar Correlativo (Serie y Número)
-      // Serie sugerida: F001 (Factura), B001 (Boleta) - Esto podrías configurarlo por caja
-      const serie = dto.type === ComprobanteType.FACTURA ? 'F001' : 'B001';
+      // A. Generar Correlativo según tipo
+      let serie: string;
+      switch (dto.type) {
+        case ComprobanteType.FACTURA:
+          serie = 'F001';
+          break;
+        case ComprobanteType.BOLETA:
+          serie = 'B001';
+          break;
+        case ComprobanteType.TICKET:
+          serie = 'T001';
+          break;
+        default:
+          serie = 'T001';
+      }
 
-      // Buscar el último número usado para esa serie
       const lastSale = await tx.sale.findFirst({
         where: { serie, type: dto.type },
         orderBy: { correlativo: 'desc' },
@@ -64,28 +94,38 @@ export class BillingService {
       const nuevoCorrelativo = (lastSale?.correlativo || 0) + 1;
       const numeroComprobante = `${serie}-${String(nuevoCorrelativo).padStart(8, '0')}`;
 
-      // B. Crear Cliente si no existe (o actualizarlo)
+      // B. Crear/Actualizar Cliente (solo si no es Ticket)
       let clientId: string | null = null;
 
-      if (dto.clientDocNumber) {
+      if (dto.type !== ComprobanteType.TICKET && dto.clientDocNumber) {
         const client = await tx.client.upsert({
           where: { docNumber: dto.clientDocNumber },
           update: {
             name: dto.clientName,
             address: dto.clientAddress,
+            email: dto.clientEmail,
           },
           create: {
             docType: dto.clientDocType || '1',
             docNumber: dto.clientDocNumber,
             name: dto.clientName || 'CLIENTE GENERICO',
-            address: dto.clientAddress,
-            email: '',
+            address: dto.clientAddress || '',
+            email: dto.clientEmail || '',
           },
         });
         clientId = client.id;
       }
 
-      // C. CREAR LA VENTA (El Snapshot Gigante)
+      // ✅ C. Obtener usuario cajero
+      const cajero = await tx.user.findUnique({
+        where: { id: user.userId },
+      });
+
+      if (!cajero) {
+        throw new NotFoundException('cajero no encontrado');
+      }
+
+      // D. CREAR LA VENTA
       const sale = await tx.sale.create({
         data: {
           orderId: order.id,
@@ -100,10 +140,10 @@ export class BillingService {
           fechaEmision: new Date(),
           tipoMoneda: 'PEN',
 
-          // Datos Emisor (TU RESTAURANTE - Esto debería venir de config/env)
+          // Datos Emisor (TODO: Mover a env/config)
           empresaRuc: '20600000001',
           empresaRazonSocial: 'ICE MANKORA S.A.C.',
-          empresaDireccion: 'Av. Principal 123, Andahuaylas',
+          empresaDireccion: 'Jr. Principal 123, Máncora, Piura',
           codigoEstablecimiento: '0000',
 
           // Datos Cliente (Snapshot)
@@ -118,31 +158,43 @@ export class BillingService {
           totalImpuestos: igvTotal,
           valorVenta: baseImponible,
           precioVentaTotal: total,
-          montoLetras: this.numberToLetters(Number(total)), // Helper abajo
+          montoLetras: this.numberToLetters(Number(total)),
 
           // Items (JSON)
           itemsSnapshot: itemsSnapshot,
 
-          // Estados y Pago
-          sunatStatus: SunatStatus.PENDIENTE, // Listo para que el CRON JOB lo envíe
+          // ✅ Nuevos campos: Pago
           paymentMethod: dto.paymentMethod,
           formaPago: 'Contado',
+          montoPagado: dto.montoPagado,
+          vuelto: dto.vuelto,
+
+          // ✅ Metadata
+          metadata: {
+            mesa: order.table.name,
+            orden: order.dailyNumber.toString(),
+            cajero: cajero.name,
+            mozo: order.user.name,
+          },
+
+          // Estados SUNAT
+          sunatStatus:
+            dto.type === ComprobanteType.TICKET
+              ? SunatStatus.PENDIENTE //arregalr
+              : SunatStatus.PENDIENTE,
         },
       });
 
-      // D. Cerrar Pedido y Liberar Mesa
+      // E. Cerrar Pedido y Liberar Mesa
       await tx.order.update({
         where: { id: order.id },
-        data: { status: OrderStatus.ENTREGADO }, // O FINALIZADO
+        data: { status: OrderStatus.ENTREGADO },
       });
 
       await tx.table.update({
         where: { id: order.tableId },
-        data: { status: TableStatus.LIBRE }, // ¡Mesa libre para nuevos clientes!
+        data: { status: TableStatus.LIBRE },
       });
-
-      // E. (OPCIONAL) Disparar envío asíncrono a SUNAT aquí
-      // this.sunatService.sendToSunat(sale.id);
 
       return sale;
     });
@@ -154,27 +206,23 @@ export class BillingService {
   private calculateTotals(items: any[]) {
     let total = 0;
     const itemsSnapshot = items.map((item) => {
-      // El precio en OrderItem ya incluye IGV (Precio Lista)
       const precioUnitarioConIgv = Number(item.price);
       const subtotalItem = precioUnitarioConIgv * item.quantity;
-
       total += subtotalItem;
 
-      // Desglose Unitario para SUNAT (Valor Unitario sin IGV)
       const valorUnitario = precioUnitarioConIgv / 1.18;
       const igvItem = subtotalItem - valorUnitario * item.quantity;
 
       return {
         productId: item.productId,
-        description: item.product.name, // Snapshot del nombre
+        description: item.product.name,
         quantity: item.quantity,
-        precioUnitario: precioUnitarioConIgv, // Incluye IGV
-        valorUnitario: valorUnitario, // Base imponible
+        precioUnitario: precioUnitarioConIgv,
+        valorUnitario: valorUnitario,
         totalItem: subtotalItem,
       };
     });
 
-    // Totales Globales
     const baseImponible = total / 1.18;
     const igvTotal = total - baseImponible;
 
@@ -186,7 +234,9 @@ export class BillingService {
     };
   }
 
-  // --- MÉTODOS AUXILIARES ---
+  /**
+   * Obtener datos para impresión
+   */
   async findOneForPrint(id: string) {
     const sale = await this.prisma.sale.findUnique({
       where: { id },
@@ -196,9 +246,10 @@ export class BillingService {
   }
 
   /**
-   * Helper simple (En producción usar librería 'numeros_a_letras')
+   * Helper: Convertir número a letras (implementar librería real en producción)
    */
   private numberToLetters(amount: number): string {
-    return `SON: ${amount.toFixed(2)} SOLES`; // Implementar librería real
+    // TODO: Implementar librería 'numero-a-letras' o similar
+    return `SON: ${amount.toFixed(2)} SOLES`;
   }
 }

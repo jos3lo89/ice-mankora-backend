@@ -1,19 +1,3 @@
-// import { IsUUID, IsNotEmpty, IsArray, ValidateNested } from 'class-validator';
-// import { AddOrderItemDto } from './add-order-item.dto';
-// import { Type } from 'class-transformer';
-
-// export class CreateOrderDto {
-//   @IsUUID()
-//   @IsNotEmpty({ message: 'La mesa es obligatoria.' })
-//   tableId: string;
-
-//   @IsArray({ message: 'Debes enviar una lista de items.' })
-//   // @ArrayNotEmpty({ message: 'Debe enviar al menos un ítem.' })
-//   @ValidateNested({ each: true })
-//   @Type(() => AddOrderItemDto) // ¡Vital para que valide cada objeto dentro del array!
-//   items: AddOrderItemDto[];
-// }
-
 import {
   IsString,
   IsUUID,
@@ -35,11 +19,12 @@ export class OrderItemDto {
 
   @IsString()
   @IsOptional()
-  notes?: string; // "Sin ají", "Bien cocido"
+  notes?: string;
 
-  @IsString()
+  @IsArray()
   @IsOptional()
-  variantsDetail?: string; // "Sabor: Fresa, Cono: Waffle"
+  @IsUUID('4', { each: true })
+  variantIds?: string[];
 }
 
 export class CreateOrderDto {

@@ -1,7 +1,13 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
 
 export class CancelOrderDto {
-  @IsOptional()
   @IsString()
-  reason?: string;
+  @IsNotEmpty({
+    message: 'El motivo es obligatorio para auditar la anulación.',
+  })
+  reason: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'Se requiere el código de autorización.' })
+  authCode: string;
 }
