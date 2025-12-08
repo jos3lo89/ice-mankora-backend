@@ -71,13 +71,72 @@ enum CashRegisterStatus {
 }
 
 // ==========================================
+// MÓDULO: GESTIÓN DE IMPRESIONES
+// ==========================================
+
+enum PrintStatus {
+  PENDING // Esperando impresión
+  PRINTED // Impreso exitosamente
+  FAILED // Error al imprimir
+  RETRYING // Reintentando
+}
+
+model PrintLog {
+  id      String @id @default(uuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // ✅ CORRECCIÓN: Impresión por PISO, no por área
+  floorId String
+  floor   Floor  @relation(fields: [floorId], references: [id])
+
+  status PrintStatus @default(PENDING)
+
+  attemptCount Int       @default(0)
+  lastAttempt  DateTime?
+
+  errorMessage String?
+
+  // Para auditoría
+  printerIp String?
+  sentData  Json? // Guarda snapshot de lo enviado
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+  @@index([floorId])
+  @@map("print_logs")
+}
+
+// ==========================================
+// MÓDULO 0: INFRAESTRUCTURA Y SISTEMA
+// ==========================================
+
+model SystemConfig {
+  key         String   @id
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_configs")
+}
+
+// ==========================================
 // MÓDULO A: INFRAESTRUCTURA (PISOS Y USUARIOS)
 // ==========================================
 
 model Floor {
-  id        String   @id @default(uuid())
-  name      String // Ej: "Piso 1 - Heladería", "Piso 2 - Restaurant"
-  level     Int      @unique // 1, 2, 3 (Para ordenamiento visual)
+  id    String @id @default(uuid())
+  name  String // Ej: "Piso 1 - Heladería", "Piso 2 - Restaurant"
+  level Int    @unique // 1, 2, 3 (Para ordenamiento visual)
+
+  // ✅ NUEVO: Configuración de impresora para este piso
+  printerIp   String? // IP de la impresora térmica del piso (ej: "192.168.1.10")
+  printerPort Int     @default(9100) // Puerto ESC/POS estándar
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -85,6 +144,8 @@ model Floor {
   tables     Table[] // Mesas físicas en este piso
   users      User[] // Mozos autorizados para este piso
   categories Category[] // Categorías de productos disponibles aquí
+  // ✅ NUEVO: Logs de impresión del piso
+  printLogs  PrintLog[]
 
   @@map("floors")
 }
@@ -108,6 +169,8 @@ model User {
   orders   Order[] // Pedidos tomados
   sales    Sale[] // Ventas cobradas
   sessions CashRegister[] // Cajas abiertas
+
+  authorizedCancellations OrderCancellation[] @relation("AuthorizedBy")
 
   @@map("users")
 }
@@ -215,14 +278,42 @@ model Order {
   userId String // Mozo
   user   User   @relation(fields: [userId], references: [id])
 
-  status    OrderStatus @default(PENDIENTE)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  status OrderStatus @default(PENDIENTE)
 
-  items OrderItem[]
-  sale  Sale? // Relación 1 a 1 con la Venta (cuando se cobra)
+  // ✅ NUEVO: Numeración por piso y día
+  dailyNumber Int // Número secuencial del día (1, 2, 3...)
+  orderDate   DateTime @default(now()) // Fecha de la orden (solo fecha, sin hora)
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items             OrderItem[]
+  sale              Sale? // Relación 1 a 1 con la Venta (cuando se cobra)
+  orderCancellation OrderCancellation?
+
+  // ✅ NUEVO: Relación con impresiones
+  printLogs PrintLog[]
+
+  // ✅ NUEVO: Índice compuesto para garantizar unicidad
+  @@unique([dailyNumber, orderDate, tableId])
+  @@index([orderDate, dailyNumber])
   @@map("orders")
+}
+
+model OrderCancellation {
+  id String @id @default(uuid())
+
+  orderId String @unique // Relación 1-1 clave
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  reason String // "El cliente se fue", "Plato frío"
+
+  authorizedById String? // Quién puso el PIN (Opcional si usas PIN genérico)
+  authorizedBy   User?   @relation("AuthorizedBy", fields: [authorizedById], references: [id])
+
+  cancelledAt DateTime @default(now())
+
+  @@map("order_cancellations")
 }
 
 model OrderItem {
@@ -291,6 +382,9 @@ model Sale {
 
   fechaEmision DateTime @default(now())
   tipoMoneda   String   @default("PEN")
+  montoPagado  Float? // Cuánto pagó el cliente
+  vuelto       Float? // Cuánto se le devuelve
+  metadata     Json? // { mesa, orden, cajero, mozo }
 
   // --- SNAPSHOT EMISOR (INMUTABILIDAD) ---
   empresaRuc            String

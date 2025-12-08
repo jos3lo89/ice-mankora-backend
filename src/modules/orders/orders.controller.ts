@@ -13,7 +13,6 @@ import { Role } from 'src/common/enums/role.enum';
 import { ActiveUser } from 'src/common/decorators/activeUser.decorator';
 import type { UserActiveI } from 'src/common/interfaces/userActive.interface';
 import { CreateOrderDto } from './dto/create-order.dto';
-import { AddOrderItemDto } from './dto/add-order-item.dto';
 import { CancelOrderDto } from './dto/cancel-order.dto';
 import { AddItemsDto } from './dto/add-items.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
@@ -34,17 +33,21 @@ export class OrdersController {
     return this.ordersService.findMyOrders(user);
   }
 
-  // @AuthAndRoleGuard(Role.MOZO, Role.ADMIN)
-  // @Patch(':orderId/items')
-  // addItems(
-  //   @Param('orderId') orderId: string,
-  //   @ActiveUser() user: UserActiveI,
-  //   @Body() items: AddOrderItemDto[],
-  // ) {
-  //   return this.ordersService.addItems(orderId, user, items);
-  // }
+  // ✅ NUEVO: Obtener logs de impresión de una orden
+  @AuthAndRoleGuard(Role.MOZO, Role.CAJERO, Role.ADMIN)
+  @Get(':id/print-logs')
+  getOrderPrintLogs(@Param('id') id: string) {
+    return this.ordersService.getOrderPrintLogs(id);
+  }
 
-  @AuthAndRoleGuard(Role.MOZO, Role.ADMIN)
+  // ✅ NUEVO: Reintentar impresión fallida
+  @AuthAndRoleGuard(Role.CAJERO, Role.ADMIN)
+  @Post('print-logs/:printLogId/retry')
+  retryPrint(@Param('printLogId') printLogId: string) {
+    return this.ordersService.retryPrint(printLogId);
+  }
+
+  @AuthAndRoleGuard(Role.CAJERO, Role.ADMIN)
   @Patch(':orderId/cancel')
   cancelOrder(
     @Param('orderId') orderId: string,
@@ -61,11 +64,13 @@ export class OrdersController {
     @Body() addItemsDto: AddItemsDto,
     @ActiveUser() user: UserActiveI,
   ) {
-    return this.ordersService.addItems2(id, addItemsDto, user);
+    console.log('body:', addItemsDto);
+
+    return this.ordersService.addItems(id, addItemsDto, user);
   }
 
   @Get('pending')
-  @AuthAndRoleGuard(Role.MOZO, Role.ADMIN, Role.CAJERO) // Cocina puede usar cuenta de mozo o admin por ahora
+  @AuthAndRoleGuard(Role.MOZO, Role.ADMIN, Role.CAJERO)
   findAllPending(@ActiveUser() user: UserActiveI) {
     return this.ordersService.findAllPending(user);
   }

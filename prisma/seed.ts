@@ -113,6 +113,41 @@ const MENU_DATA = [
 async function main() {
   console.log('🌱 Iniciando Seed de Base de Datos para Ice Mankora...');
 
+  await prisma.systemConfig.upsert({
+    where: { key: 'ADMIN_PIN' },
+    update: {},
+    create: {
+      key: 'ADMIN_PIN',
+      value: '9999',
+      description: 'PIN maestro para anulaciones y acciones sensibles',
+    },
+  });
+
+  // Configurar impresoras para cada piso
+  await prisma.floor.update({
+    where: { level: 1 },
+    data: {
+      printerIp: '192.168.1.10',
+      printerPort: 9100,
+    },
+  });
+
+  await prisma.floor.update({
+    where: { level: 2 },
+    data: {
+      printerIp: '192.168.1.11',
+      printerPort: 9100,
+    },
+  });
+
+  await prisma.floor.update({
+    where: { level: 3 },
+    data: {
+      printerIp: '192.168.1.12',
+      printerPort: 9100,
+    },
+  });
+
   // console.log('... Creando Pisos');
   // const floor1 = await prisma.floor.upsert({
   //   where: { level: 1 },

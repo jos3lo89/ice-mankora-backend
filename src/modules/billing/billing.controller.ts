@@ -20,15 +20,16 @@ export class BillingController {
   @AuthAndRoleGuard(Role.CAJERO, Role.ADMIN, Role.MOZO)
   async getPrintData(@Param('id') id: string) {
     const sale = await this.billingService.findOneForPrint(id);
+
     return {
       company: {
         ruc: sale.empresaRuc,
         name: sale.empresaRazonSocial,
         address: sale.empresaDireccion,
-        logo: 'https://icemankora.com/logo.png',
+        logo: 'https://www.evilain.site/logo.webp', // TODO: Usar variable de entorno
       },
       document: {
-        type: sale.type, // BOLETA/FACTURA
+        type: sale.type, // BOLETA/FACTURA/TICKET
         number: sale.numeroComprobante,
         date: sale.fechaEmision,
         currency: sale.tipoMoneda,
@@ -36,6 +37,7 @@ export class BillingController {
       client: {
         name: sale.clienteRazonSocial,
         doc: sale.clienteNumDoc,
+        docType: sale.clienteTipoDoc,
         address: sale.clienteDireccion,
       },
       items: sale.itemsSnapshot, // El JSON guardado
@@ -45,9 +47,25 @@ export class BillingController {
         total: sale.precioVentaTotal,
         totalLetters: sale.montoLetras,
       },
+      payment: {
+        method: sale.paymentMethod,
+        montoPagado: sale.montoPagado,
+        vuelto: sale.vuelto,
+      },
       sunat: {
         hash: sale.hash, // Firma digital para el QR
         status: sale.sunatStatus,
+      },
+      // ✅ Metadata adicional
+      metadata: sale.metadata || {
+        mesa: '-',
+        orden: '-',
+        cajero: '-',
+        fecha: new Date(sale.fechaEmision).toLocaleDateString('es-PE'),
+        hora: new Date(sale.fechaEmision).toLocaleTimeString('es-PE', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
       },
     };
   }
