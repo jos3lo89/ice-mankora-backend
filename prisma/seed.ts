@@ -13,104 +13,328 @@ const prisma = new PrismaClient({
   adapter,
 });
 
+// const MENU_DATA = [
+//   {
+//     category: 'Entradas',
+//     floorLevel: 1,
+//     items: [
+//       { name: 'Capchi de queso', price: 10.0 },
+//       { name: 'Tequeños', price: 12.0 },
+//       { name: 'Huancaina', price: 10.0 },
+//       { name: 'Ocopa', price: 10.0 },
+//       { name: 'Leche de Tigre', price: 12.0 },
+//       { name: 'Sopa Dieta', price: 15.0 },
+//     ],
+//   },
+//   {
+//     category: 'Platos de Fondo',
+//     floorLevel: 1,
+//     items: [
+//       { name: 'Alitas fritas', price: 20.0 },
+//       { name: 'Pollo brosther', price: 20.0 },
+//       { name: 'Chicken finger', price: 20.0 },
+//       { name: 'Ceviche de tilapia', price: 25.0 },
+//       { name: 'Crispi', price: 25.0 },
+//       { name: 'Milanesa de pollo', price: 28.0 },
+//       { name: 'Pechuga a la parrilla', price: 27.0 },
+//       { name: 'Chicharron andahuaylino', price: 30.0 },
+//       { name: 'Chicharron de Cuy', price: 55.0 },
+//     ],
+//   },
+//   {
+//     category: 'Piqueos & Snacks',
+//     floorLevel: 1,
+//     items: [{ name: 'Hamburguesa', price: 18.0 }],
+//   },
+//   {
+//     category: 'Desayunos',
+//     floorLevel: 1,
+//     items: [
+//       { name: 'Pollo Deshilachado', price: 10.0 },
+//       { name: 'Choripán', price: 10.0 },
+//       { name: 'Pan con milanesa', price: 13.0 },
+//       { name: 'Pan con Chicharron', price: 13.0 },
+//       { name: 'Bowl de frutas', price: 15.0 },
+//       { name: 'Ensalada de frutas', price: 17.0 },
+//     ],
+//   },
+//   {
+//     category: 'Combos',
+//     floorLevel: 1,
+//     items: [
+//       {
+//         name: 'Jugo clásico + panqueques de avena + Ensalada de fruta',
+//         price: 18.0,
+//       },
+//     ],
+//   },
+//   {
+//     category: 'Postres',
+//     floorLevel: 1,
+//     items: [
+//       { name: 'Waffles', price: 20.0 },
+//       { name: 'Waffle burbuja', price: 13.0 },
+//       { name: 'Crepes', price: 20.0 },
+//       { name: 'Brownie', price: 20.0 },
+//       { name: 'Crema Especial (fruta de temporada)', price: 15.0 },
+//       { name: 'Panqueques de avena', price: 18.0 },
+//     ],
+//   },
+//   {
+//     category: 'Helados',
+//     floorLevel: 3,
+//     items: [
+//       { name: 'Copa Clásica', price: 10.0 },
+//       { name: 'Copa experiencia', price: 15.0 },
+//       { name: 'Banana Splite', price: 15.0 },
+//     ],
+//   },
+//   {
+//     category: 'BEBIDAS, JUGOS & REFRESCANTES ',
+//     floorLevel: 3,
+//     items: [
+//       { name: 'Café', price: 4.0 },
+//       { name: 'Infusiones', price: 4.0 },
+//       { name: 'Café Expreso', price: 6.0 },
+//       { name: 'Capuchino', price: 12.0 },
+//       { name: 'Jugos (frutas de temporada)', price: 10.0 },
+//       { name: 'Chicha Morada', price: 12.0 },
+//       { name: 'Maracuyá', price: 12.0 },
+//       { name: 'Limonada', price: 12.0 },
+//     ],
+//   },
+//   {
+//     category: 'Bebidas Frías',
+//     floorLevel: 3,
+//     items: [
+//       { name: 'Soda Italiana', price: 10.0 },
+//       { name: 'Frappe', price: 15.0 },
+//       { name: 'Bubble tea', price: 18.0 },
+//       { name: 'Refrescantes 1L', price: 18.0 },
+//     ],
+//   },
+// ];
+
 const MENU_DATA = [
+  // ================================
+  //           ENTRADAS
+  // ================================
   {
     category: 'Entradas',
     floorLevel: 1,
     items: [
+      { name: 'Tequeño', price: 12.0 },
       { name: 'Capchi de queso', price: 10.0 },
-      { name: 'Tequeños', price: 12.0 },
       { name: 'Huancaina', price: 10.0 },
       { name: 'Ocopa', price: 10.0 },
-      { name: 'Leche de Tigre', price: 12.0 },
-      { name: 'Sopa Dieta', price: 15.0 },
+      { name: 'Sopa Dieta de pollo', price: 15.0 },
     ],
   },
+
+  // ================================
+  //        PLATOS DE FONDO
+  // ================================
   {
     category: 'Platos de Fondo',
     floorLevel: 1,
     items: [
-      { name: 'Alitas fritas', price: 20.0 },
-      { name: 'Pollo brosther', price: 20.0 },
-      { name: 'Chicken finger', price: 20.0 },
       { name: 'Ceviche de tilapia', price: 25.0 },
-      { name: 'Crispi', price: 25.0 },
-      { name: 'Milanesa de pollo', price: 28.0 },
+      { name: 'Milanesa de pollo', price: 20.0 },
       { name: 'Pechuga a la parrilla', price: 27.0 },
-      { name: 'Chicharron andahuaylino', price: 30.0 },
-      { name: 'Chicharron de Cuy', price: 55.0 },
+      { name: 'Chicharrón Andahuaylino', price: 30.0 },
+      { name: 'Chicharrón de Cuy', price: 55.0 },
     ],
   },
+
+  // ================================
+  //        PIQUEOS & SNACKS
+  // ================================
   {
     category: 'Piqueos & Snacks',
     floorLevel: 1,
-    items: [{ name: 'Hamburguesa', price: 18.0 }],
+    items: [
+      { name: 'Chicken Pops', price: 20.0 },
+      { name: 'Chicken finger', price: 20.0 },
+      { name: 'Chicken con hojuelas de quinua', price: 20.0 },
+      { name: 'Tonkatsu', price: 28.0 },
+      { name: 'Hamburguesa (Clásica/Royal/Casa)', price: 18.0 },
+    ],
   },
+
+  // ================================
+  //       PARA EMPEZAR EL DÍA
+  // ================================
   {
-    category: 'Desayunos',
+    category: 'Para empezar el día',
     floorLevel: 1,
     items: [
-      { name: 'Pollo Deshilachado', price: 10.0 },
-      { name: 'Choripán', price: 10.0 },
-      { name: 'Pan con milanesa', price: 13.0 },
-      { name: 'Pan con Chicharron', price: 13.0 },
       { name: 'Bowl de frutas', price: 15.0 },
       { name: 'Ensalada de frutas', price: 17.0 },
     ],
   },
+
+  // ================================
+  //           SANDWICHES
+  // ================================
+  {
+    category: 'Sandwiches',
+    floorLevel: 1,
+    items: [
+      { name: 'Pollo deshilachado', price: 10.0 },
+      { name: 'Choripán', price: 10.0 },
+      { name: 'Pan con milanesa', price: 13.0 },
+      { name: 'Pan con chicharrón', price: 15.0 },
+    ],
+  },
+
+  // ================================
+  //          HELADOS GOURMET
+  // ================================
+  {
+    category: 'Helados Gourmet',
+    floorLevel: 3,
+    items: [
+      { name: 'Copa Clásica', price: 10.0 },
+      { name: 'Banana Split', price: 15.0 },
+    ],
+  },
+
+  // ================================
+  //        POSTRES ICE MANKORA
+  // ================================
+  {
+    category: 'Postres Ice Mankora',
+    floorLevel: 1,
+    items: [
+      { name: 'Waffles', price: 20.0 },
+      { name: 'Crepes', price: 20.0 },
+      { name: 'Brownies', price: 15.0 },
+      { name: 'Fruitys cream', price: 15.0 },
+      { name: 'Panques', price: 18.0 },
+    ],
+  },
+
+  // ================================
+  //      POSTRES TRADICIONALES
+  // ================================
+  {
+    category: 'Postres Tradicionales',
+    floorLevel: 1,
+    items: [
+      { name: 'Gelatinas', price: 5.0 },
+      { name: 'Flan', price: 5.0 },
+      { name: 'Mause maracuyá', price: 7.0 },
+      { name: 'Cheesecake', price: 10.0 },
+      { name: 'Cuchareables', price: 8.0 },
+    ],
+  },
+
+  // ================================
+  //             PASTELES
+  // ================================
+  {
+    category: 'Pasteles',
+    floorLevel: 1,
+    items: [
+      { name: 'Enrollado de queso', price: 1.2 },
+      { name: 'Enrollado de sauco', price: 1.2 },
+      { name: 'Pionono', price: 1.5 },
+      { name: 'Cachitos', price: 1.5 },
+      { name: 'Leche asada', price: 2.0 },
+      { name: 'Pie de manzana', price: 2.5 },
+      { name: 'Empanada de carne', price: 5.0 },
+      { name: 'Empanada de pollo', price: 5.0 },
+      { name: 'Torta helada', price: 5.0 },
+    ],
+  },
+
+  // ================================
+  //             COMBOS
+  // ================================
   {
     category: 'Combos',
     floorLevel: 1,
     items: [
       {
-        name: 'Jugo clásico + panqueques de avena + Ensalada de fruta',
+        name: 'Jugo clásico + panques de avena + ensalada de frutas',
         price: 18.0,
+      },
+      {
+        name: 'Jugo clásico + empanada + café pasado',
+        price: 15.0,
       },
     ],
   },
+
+  // ================================
+  //         BEBIDAS CALIENTES
+  // ================================
   {
-    category: 'Postres',
-    floorLevel: 1,
-    items: [
-      { name: 'Waffles', price: 20.0 },
-      { name: 'Waffle burbuja', price: 13.0 },
-      { name: 'Crepes', price: 20.0 },
-      { name: 'Brownie', price: 20.0 },
-      { name: 'Crema Especial (fruta de temporada)', price: 15.0 },
-      { name: 'Panqueques de avena', price: 18.0 },
-    ],
-  },
-  {
-    category: 'Helados',
-    floorLevel: 3,
-    items: [
-      { name: 'Copa Clásica', price: 10.0 },
-      { name: 'Copa experiencia', price: 15.0 },
-      { name: 'Banana Splite', price: 15.0 },
-    ],
-  },
-  {
-    category: 'BEBIDAS, JUGOS & REFRESCANTES ',
+    category: 'Bebidas Calientes',
     floorLevel: 3,
     items: [
       { name: 'Café', price: 4.0 },
-      { name: 'Infusiones', price: 4.0 },
+      { name: 'Chocolate', price: 5.0 },
       { name: 'Café Expreso', price: 6.0 },
       { name: 'Capuchino', price: 12.0 },
-      { name: 'Jugos (frutas de temporada)', price: 10.0 },
-      { name: 'Chicha Morada', price: 12.0 },
-      { name: 'Maracuyá', price: 12.0 },
-      { name: 'Limonada', price: 12.0 },
     ],
   },
+
+  // ================================
+  //            INFUSIONES
+  // ================================
+  {
+    category: 'Infusiones',
+    floorLevel: 3,
+    items: [{ name: 'Infusiones (naturales y aromáticas)', price: 4.0 }],
+  },
+
+  // ================================
+  //               JUGOS
+  //     (CON VARIANTE + S/2.00)
+  // ================================
+  {
+    category: 'Jugos',
+    floorLevel: 3,
+    items: [
+      { name: 'Papaya', price: 6.0 },
+      { name: 'Plátano', price: 6.0 },
+      { name: 'Mango', price: 6.0 },
+      { name: 'Arándanos', price: 8.0 },
+      { name: 'Fresas', price: 8.0 },
+      { name: 'Piña', price: 8.0 },
+      { name: 'Mix de jugos (2 frutas)', price: 12.0 },
+    ],
+    variants: [{ name: 'Con leche', priceExtra: 2.0 }],
+  },
+
+  // ================================
+  //               ZUMOS
+  // ================================
+  {
+    category: 'Zumos 1LT',
+    floorLevel: 3,
+    items: [
+      { name: 'Chicha morada 1LT', price: 12.0 },
+      { name: 'Maracuyá 1LT', price: 12.0 },
+      { name: 'Limonada 1LT', price: 12.0 },
+      { name: 'Naranjada 1LT', price: 12.0 },
+      { name: 'Vaso de zumos', price: 3.0 },
+    ],
+  },
+
+  // ================================
+  //           BEBIDAS FRÍAS
+  // ================================
   {
     category: 'Bebidas Frías',
     floorLevel: 3,
     items: [
       { name: 'Soda Italiana', price: 10.0 },
       { name: 'Frappe', price: 15.0 },
-      { name: 'Bubble tea', price: 18.0 },
-      { name: 'Refrescantes 1L', price: 18.0 },
+      { name: 'Refrescantes 1LT', price: 8.0 },
+      { name: 'Refrescante vaso', price: 10.0 },
+      { name: 'Mocktail', price: 12.0 },
     ],
   },
 ];
