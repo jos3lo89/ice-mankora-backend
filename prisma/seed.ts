@@ -122,19 +122,19 @@ async function main() {
   const floor1 = await prisma.floor.upsert({
     where: { level: 1 },
     update: {},
-    create: { name: 'Piso 1 - Heladería & Café', level: 1 },
+    create: { name: 'Piso 1', level: 1 },
   });
 
   const floor2 = await prisma.floor.upsert({
     where: { level: 2 },
     update: {},
-    create: { name: 'Piso 2 - Restaurante', level: 2 },
+    create: { name: 'Piso 2', level: 2 },
   });
 
   const floor3 = await prisma.floor.upsert({
     where: { level: 3 },
     update: {},
-    create: { name: 'Piso 3 - Eventos & Terraza', level: 3 },
+    create: { name: 'Piso 3', level: 3 },
   });
 
   console.log('... Creando Usuarios');
@@ -159,7 +159,7 @@ async function main() {
     where: { username: 'ADMIN2' },
     update: {},
     create: {
-      name: 'Sofia Gerente',
+      name: 'Sofia',
       dni: '10000002',
       username: 'ADMIN2',
       password: await bcrypt.hash('1000', 10),
@@ -174,7 +174,7 @@ async function main() {
     where: { username: 'CAJA1' },
     update: {},
     create: {
-      name: 'Luis Cajero',
+      name: 'CAJA1',
       dni: '20000001',
       username: 'CAJA1',
       password: await bcrypt.hash('2000', 10),
@@ -189,12 +189,14 @@ async function main() {
     where: { username: 'MOZO1A' },
     update: {},
     create: {
-      name: 'Juan Heladero',
+      name: 'MOZO1A',
       dni: '30000001',
       username: 'MOZO1A',
       password: await bcrypt.hash('3000', 10),
       role: UserRole.MOZO,
-      floors: { connect: [{ id: floor1.id }, { id: floor2.id }] },
+      floors: {
+        connect: [{ id: floor1.id }, { id: floor2.id }, { id: floor3.id }],
+      },
     },
   });
 
@@ -202,12 +204,14 @@ async function main() {
     where: { username: 'MOZO1B' },
     update: {},
     create: {
-      name: 'Maria Cafetera',
+      name: 'MOZO1B',
       dni: '30000002',
       username: 'MOZO1B',
       password: await bcrypt.hash('3000', 10),
       role: UserRole.MOZO,
-      floors: { connect: [{ id: floor1.id }, { id: floor2.id }] },
+      floors: {
+        connect: [{ id: floor1.id }, { id: floor2.id }, { id: floor3.id }],
+      },
     },
   });
 
@@ -215,12 +219,14 @@ async function main() {
     where: { username: 'MOZO2A' },
     update: {},
     create: {
-      name: 'Pedro Mesero',
+      name: 'MOZO2A',
       dni: '40000001',
       username: 'MOZO2A',
       password: await bcrypt.hash('4000', 10),
       role: UserRole.MOZO,
-      floors: { connect: [{ id: floor1.id }, { id: floor2.id }] },
+      floors: {
+        connect: [{ id: floor1.id }, { id: floor2.id }, { id: floor3.id }],
+      },
     },
   });
 
@@ -228,12 +234,14 @@ async function main() {
     where: { username: 'MOZO2B' },
     update: {},
     create: {
-      name: 'Ana Salon',
+      name: 'MOZO2B',
       dni: '40000002',
       username: 'MOZO2B',
       password: await bcrypt.hash('4000', 10),
       role: UserRole.MOZO,
-      floors: { connect: [{ id: floor1.id }, { id: floor2.id }] },
+      floors: {
+        connect: [{ id: floor1.id }, { id: floor2.id }, { id: floor3.id }],
+      },
     },
   });
 
@@ -242,12 +250,14 @@ async function main() {
     where: { username: 'MOZO3A' },
     update: {},
     create: {
-      name: 'Jorge Terraza',
+      name: 'MOZO3A',
       dni: '50000001',
       username: 'MOZO3A',
       password: await bcrypt.hash('5000', 10),
       role: UserRole.MOZO,
-      floors: { connect: [{ id: floor3.id }, { id: floor2.id }] }, // Piso 3 y apoya en Piso 2
+      floors: {
+        connect: [{ id: floor1.id }, { id: floor2.id }, { id: floor3.id }],
+      },
     },
   });
 
@@ -255,12 +265,15 @@ async function main() {
     where: { username: 'MOZO3B' },
     update: {},
     create: {
-      name: 'Lucia Eventos',
+      name: 'MOZO3B',
       dni: '50000002',
       username: 'MOZO3B',
       password: await bcrypt.hash('5000', 10),
       role: UserRole.MOZO,
-      floors: { connect: [{ id: floor3.id }] },
+
+      floors: {
+        connect: [{ id: floor1.id }, { id: floor2.id }, { id: floor3.id }],
+      },
     },
   });
 
@@ -268,12 +281,14 @@ async function main() {
     where: { username: 'MOZO3C' },
     update: {},
     create: {
-      name: 'Lucia ero',
+      name: 'MOZO3C',
       dni: '50000003',
       username: 'MOZO3C',
       password: await bcrypt.hash('5000', 10),
       role: UserRole.MOZO,
-      floors: { connect: [{ id: floor3.id }] },
+      floors: {
+        connect: [{ id: floor1.id }, { id: floor2.id }, { id: floor3.id }],
+      },
     },
   });
 
@@ -319,11 +334,11 @@ async function main() {
             name: item.name,
             price: item.price,
             categoryId: category.id,
-            stockDaily: 20, // Stock ficticio inicial
+            stockDaily: 50,
             stockWarehouse: 100,
             description: `Delicioso ${item.name} estilo Ice Mankora`,
             isActive: true,
-            taxType: 'GRAVADO', // Default SUNAT
+            taxType: 'GRAVADO',
             igvRate: 0.18,
           },
         });

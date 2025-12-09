@@ -10,6 +10,7 @@ async function bootstrap() {
 
   app.enableCors({
     origin: ['https://www.evilain.site', 'https://evilain.site'],
+    // origin: true,
     credentials: true,
   });
 
