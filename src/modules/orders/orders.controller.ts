@@ -6,6 +6,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { AuthAndRoleGuard } from 'src/common/decorators/auth.decorator';
@@ -23,8 +24,10 @@ export class OrdersController {
 
   @AuthAndRoleGuard(Role.MOZO, Role.ADMIN)
   @Post()
-  create(@ActiveUser() user: UserActiveI, @Body() dto: CreateOrderDto) {
-    return this.ordersService.create(dto, user);
+  async create(@ActiveUser() user: UserActiveI, @Body() dto: CreateOrderDto) {
+    const result = await this.ordersService.create(dto, user);
+
+    return result;
   }
 
   @AuthAndRoleGuard(Role.MOZO, Role.ADMIN)
@@ -101,4 +104,35 @@ export class OrdersController {
   findActiveByTable(@Param('tableId', ParseUUIDPipe) tableId: string) {
     return this.ordersService.findActiveOrder(tableId);
   }
+
+  /**
+   * ✅ NUEVO: Reimprimir comanda
+   * Query params:
+   * - printer: 'cocina' | 'bebidas' | 'todas'
+   */
+  @Post(':id/reprint-comanda')
+  reprintComanda(
+    @Param('id') id: string,
+    @Query('printer') printer: 'cocina' | 'bebidas' | 'todas' = 'todas',
+  ) {
+    console.log(printer, id);
+
+    return this.ordersService.reprintComanda(id, printer);
+  }
+
+  /**
+   * ✅ NUEVO: Verificar estado del servicio de impresión
+   */
+  // @Get('printer/status')
+  // getPrinterServiceStatus() {
+  //   return this.ordersService.getPrinterServiceStatus();
+  // }
+
+  /**
+   * ✅ NUEVO: Obtener configuración de impresoras
+   */
+  // @Get('printer/config')
+  // getPrintersConfig() {
+  //   return this.ordersService.getPrintersConfig();
+  // }
 }
