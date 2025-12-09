@@ -269,7 +269,7 @@ async function main() {
     update: {},
     create: {
       name: 'Lucia ero',
-      dni: '50000002',
+      dni: '50000003',
       username: 'MOZO3C',
       password: await bcrypt.hash('5000', 10),
       role: UserRole.MOZO,
