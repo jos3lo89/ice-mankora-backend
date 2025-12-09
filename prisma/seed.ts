@@ -16,7 +16,7 @@ const prisma = new PrismaClient({
 const MENU_DATA = [
   {
     category: 'Entradas',
-    floorLevel: 2,
+    floorLevel: 1,
     items: [
       { name: 'Capchi de queso', price: 10.0 },
       { name: 'Tequeños', price: 12.0 },
@@ -28,7 +28,7 @@ const MENU_DATA = [
   },
   {
     category: 'Platos de Fondo',
-    floorLevel: 2,
+    floorLevel: 1,
     items: [
       { name: 'Alitas fritas', price: 20.0 },
       { name: 'Pollo brosther', price: 20.0 },
@@ -69,15 +69,6 @@ const MENU_DATA = [
     ],
   },
   {
-    category: 'Helados',
-    floorLevel: 1,
-    items: [
-      { name: 'Copa Clásica', price: 10.0 },
-      { name: 'Copa experiencia', price: 15.0 },
-      { name: 'Banana Splite', price: 15.0 },
-    ],
-  },
-  {
     category: 'Postres',
     floorLevel: 1,
     items: [
@@ -90,8 +81,17 @@ const MENU_DATA = [
     ],
   },
   {
-    category: 'Bebidas Calientes',
-    floorLevel: 1,
+    category: 'Helados',
+    floorLevel: 3,
+    items: [
+      { name: 'Copa Clásica', price: 10.0 },
+      { name: 'Copa experiencia', price: 15.0 },
+      { name: 'Banana Splite', price: 15.0 },
+    ],
+  },
+  {
+    category: 'BEBIDAS, JUGOS & REFRESCANTES ',
+    floorLevel: 3,
     items: [
       { name: 'Café', price: 4.0 },
       { name: 'Infusiones', price: 4.0 },
@@ -104,8 +104,8 @@ const MENU_DATA = [
     ],
   },
   {
-    category: 'Bebidas Frías y Jugos',
-    floorLevel: 1,
+    category: 'Bebidas Frías',
+    floorLevel: 3,
     items: [
       { name: 'Soda Italiana', price: 10.0 },
       { name: 'Frappe', price: 15.0 },
