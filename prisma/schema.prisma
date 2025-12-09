@@ -63,6 +63,7 @@ enum SunatStatus {
   ACEPTADO // CDR OK
   RECHAZADO // CDR Error
   ANULADO // Comunicación de baja aceptada
+  NO_APLICA // ✅ NUEVO: Para tickets de consumo (no fiscales)
 }
 
 enum CashRegisterStatus {

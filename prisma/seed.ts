@@ -61,7 +61,12 @@ const MENU_DATA = [
   {
     category: 'Combos',
     floorLevel: 1,
-    items: [{ name: 'Jugo clásico + panqueques + Ensalada', price: 18.0 }],
+    items: [
+      {
+        name: 'Jugo clásico + panqueques de avena + Ensalada de fruta',
+        price: 18.0,
+      },
+    ],
   },
   {
     category: 'Helados',
@@ -69,7 +74,7 @@ const MENU_DATA = [
     items: [
       { name: 'Copa Clásica', price: 10.0 },
       { name: 'Copa experiencia', price: 15.0 },
-      { name: 'Banana Split', price: 15.0 },
+      { name: 'Banana Splite', price: 15.0 },
     ],
   },
   {
@@ -80,7 +85,7 @@ const MENU_DATA = [
       { name: 'Waffle burbuja', price: 13.0 },
       { name: 'Crepes', price: 20.0 },
       { name: 'Brownie', price: 20.0 },
-      { name: 'Crema Especial', price: 15.0 },
+      { name: 'Crema Especial (fruta de temporada)', price: 15.0 },
       { name: 'Panqueques de avena', price: 18.0 },
     ],
   },
@@ -92,16 +97,16 @@ const MENU_DATA = [
       { name: 'Infusiones', price: 4.0 },
       { name: 'Café Expreso', price: 6.0 },
       { name: 'Capuchino', price: 12.0 },
+      { name: 'Jugos (frutas de temporada)', price: 10.0 },
+      { name: 'Chicha Morada', price: 12.0 },
+      { name: 'Maracuyá', price: 12.0 },
+      { name: 'Limonada', price: 12.0 },
     ],
   },
   {
     category: 'Bebidas Frías y Jugos',
     floorLevel: 1,
     items: [
-      { name: 'Jugos (Temporada)', price: 10.0 },
-      { name: 'Chicha Morada', price: 12.0 },
-      { name: 'Maracuyá', price: 12.0 },
-      { name: 'Limonada', price: 12.0 },
       { name: 'Soda Italiana', price: 10.0 },
       { name: 'Frappe', price: 15.0 },
       { name: 'Bubble tea', price: 18.0 },
@@ -189,7 +194,7 @@ async function main() {
       username: 'MOZO1A',
       password: await bcrypt.hash('3000', 10),
       role: UserRole.MOZO,
-      floors: { connect: [{ id: floor1.id }] },
+      floors: { connect: [{ id: floor1.id }, { id: floor2.id }] },
     },
   });
 
@@ -202,7 +207,7 @@ async function main() {
       username: 'MOZO1B',
       password: await bcrypt.hash('3000', 10),
       role: UserRole.MOZO,
-      floors: { connect: [{ id: floor1.id }] },
+      floors: { connect: [{ id: floor1.id }, { id: floor2.id }] },
     },
   });
 
@@ -215,7 +220,7 @@ async function main() {
       username: 'MOZO2A',
       password: await bcrypt.hash('4000', 10),
       role: UserRole.MOZO,
-      floors: { connect: [{ id: floor2.id }] },
+      floors: { connect: [{ id: floor1.id }, { id: floor2.id }] },
     },
   });
 
@@ -228,7 +233,7 @@ async function main() {
       username: 'MOZO2B',
       password: await bcrypt.hash('4000', 10),
       role: UserRole.MOZO,
-      floors: { connect: [{ id: floor2.id }] },
+      floors: { connect: [{ id: floor1.id }, { id: floor2.id }] },
     },
   });
 
@@ -253,6 +258,19 @@ async function main() {
       name: 'Lucia Eventos',
       dni: '50000002',
       username: 'MOZO3B',
+      password: await bcrypt.hash('5000', 10),
+      role: UserRole.MOZO,
+      floors: { connect: [{ id: floor3.id }] },
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { username: 'MOZO3C' },
+    update: {},
+    create: {
+      name: 'Lucia ero',
+      dni: '50000002',
+      username: 'MOZO3C',
       password: await bcrypt.hash('5000', 10),
       role: UserRole.MOZO,
       floors: { connect: [{ id: floor3.id }] },

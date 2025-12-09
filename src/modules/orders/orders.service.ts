@@ -20,7 +20,7 @@ import { PrinterService } from '../printer/printer.service';
 export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
-    private printerService: PrinterService,
+    private readonly printerService: PrinterService,
   ) {}
 
   async create(createOrderDto: CreateOrderDto, user: UserActiveI) {
@@ -100,35 +100,8 @@ export class OrdersService {
           });
         }
 
-        // const startOfToday = new Date();
-        // startOfToday.setHours(0, 0, 0, 0);
-
-        // const endOfToday = new Date();
-        // endOfToday.setHours(23, 59, 59, 999);
-
-        // const lastOrderToday = await tx.order.findFirst({
-        //   where: {
-        //     orderDate: {
-        //       gte: startOfToday,
-        //       lte: endOfToday,
-        //     },
-        //     table: {
-        //       floorId: table.floorId,
-        //     },
-        //   },
-        //   orderBy: {
-        //     dailyNumber: 'desc',
-        //   },
-        //   select: {
-        //     dailyNumber: true,
-        //   },
-        // });
-
-        // const nextDailyNumber = (lastOrderToday?.dailyNumber ?? 0) + 1;
-
-        // ✅ NUEVO: Crear orden con número del día
         const orderDate = new Date();
-        orderDate.setHours(0, 0, 0, 0); // Solo fecha, sin hora
+        orderDate.setHours(0, 0, 0, 0);
 
         const newOrder = await tx.order.create({
           data: {
@@ -147,6 +120,7 @@ export class OrdersService {
                 product: {
                   include: {
                     variants: true,
+                    category: true,
                   },
                 },
               },
@@ -168,10 +142,7 @@ export class OrdersService {
         return newOrder;
       });
 
-      // ✅ NUEVO: Imprimir comanda automáticamente después de crear la orden
-      await this.printerService.printOrderComanda(result.id);
-
-      console.log(JSON.stringify(result));
+      this.printOrderToKitchen(result.id);
 
       return result;
     } catch (error) {
@@ -180,7 +151,229 @@ export class OrdersService {
     }
   }
 
-  // ✅ NUEVO: Obtener el próximo número de orden del día para el piso
+  private async prepareComandaData(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: {
+            product: {
+              include: {
+                category: true,
+                variants: true,
+              },
+            },
+          },
+        },
+        table: {
+          include: {
+            floor: true,
+          },
+        },
+        user: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Orden no encontrada');
+    }
+
+    const fecha = new Date(order.createdAt).toLocaleDateString('es-PE');
+    const hora = new Date(order.createdAt).toLocaleTimeString('es-PE', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    const items = order.items.map((item) => ({
+      productName: item.product.name,
+      category: item.product.category.name,
+      quantity: item.quantity,
+      unitPrice: Number(item.price),
+      totalPrice: Number(item.price) * item.quantity,
+      variants: item.variantsDetail || null,
+      notes: item.notes || null,
+    }));
+
+    const comandaPayload = {
+      order_number: order.dailyNumber.toString(),
+      order_id: order.id,
+      table_name: order.table.name,
+      table_number: order.table.number,
+      floor_name: order.table.floor.name,
+      floor_level: order.table.floor.level,
+      waiter_name: order.user.name,
+      waiter_username: order.user.username,
+      date: fecha,
+      time: hora,
+      items: items,
+      total_items: items.length,
+      total_quantity: items.reduce((sum, item) => sum + item.quantity, 0),
+      total_amount: items.reduce((sum, item) => sum + item.totalPrice, 0),
+    };
+
+    return comandaPayload;
+  }
+
+  async printOrderComanda(orderId: string) {
+    try {
+      const comandaData = await this.prepareComandaData(orderId);
+      console.log('COMANDA DATA ------>>>>>', JSON.stringify(comandaData));
+    } catch (error) {
+      console.error('❌ Error preparando comanda:', error);
+    }
+  }
+
+  /**
+   * Método público para imprimir la comanda de una orden
+   * Este método lo llamas desde tu Controller cuando creas o actualizas una orden
+   */
+  async printOrderToKitchen(orderId: string) {
+    // 1. Obtener los datos crudos de la BD
+    const payload = await this.prepareComandaData(orderId);
+
+    // 2. Mapear los datos al formato que espera Python
+    // Python espera: { description, quantity, variants, notes }
+    // Tu payload tiene: { productName, quantity, variants, notes }
+    const itemsParaImpresora = payload.items.map((item) => ({
+      quantity: item.quantity,
+      description: item.productName, // Mapeamos productName a description
+      variants: item.variants,
+      notes: item.notes,
+    }));
+
+    // 3. Enviar al PrinterService
+    try {
+      const piso = payload.floor_level === 3;
+
+      await this.printerService.printComanda({
+        printer: piso ? 'bebidas' : 'cocina', // <--- Esto le dice a Python que use la IP 192.168.18.36 (según config.json)
+        table: payload.table_name,
+        order_number: payload.order_number,
+        date: payload.date,
+        time: payload.time,
+        waiter: payload.waiter_name,
+        items: itemsParaImpresora,
+        total_items: payload.total_items,
+      });
+
+      return { success: true, message: 'Enviado a cocina (.36)' };
+    } catch (error) {
+      console.error('Error imprimiendo comanda:', error);
+      // No lanzamos error para no romper el flujo de venta si la impresora falla
+      return { success: false, message: 'Error de impresión' };
+    }
+  }
+
+  async reprintComanda(
+    orderId: string,
+    printerType: 'cocina' | 'bebidas' | 'todas',
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: {
+            product: {
+              include: {
+                category: true,
+              },
+            },
+          },
+        },
+        table: {
+          include: {
+            floor: true,
+          },
+        },
+        user: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Orden no encontrada');
+    }
+
+    const cocinaItems = order.items.filter((item) => {
+      const categoryName = item.product.category.name.toLowerCase();
+      return (
+        categoryName.includes('comida') ||
+        categoryName.includes('plato') ||
+        categoryName.includes('parrilla') ||
+        categoryName.includes('entrada') ||
+        categoryName.includes('postre')
+      );
+    });
+
+    const bebidasItems = order.items.filter((item) => {
+      const categoryName = item.product.category.name.toLowerCase();
+      return (
+        categoryName.includes('bebida') ||
+        categoryName.includes('jugo') ||
+        categoryName.includes('cerveza') ||
+        categoryName.includes('licor') ||
+        categoryName.includes('gaseosa')
+      );
+    });
+
+    const results: any = [];
+
+    // Imprimir según selección
+    if (
+      (printerType === 'cocina' || printerType === 'todas') &&
+      cocinaItems.length > 0
+    ) {
+      await this.printerService.printComanda({
+        printer: 'cocina',
+        table: order.table.name,
+        order_number: order.dailyNumber.toString(),
+        date: new Date(order.createdAt).toLocaleDateString('es-PE'),
+        time: new Date(order.createdAt).toLocaleTimeString('es-PE', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        waiter: order.user.name,
+        items: cocinaItems.map((item) => ({
+          quantity: item.quantity,
+          description: item.product.name,
+          variants: item.variantsDetail as string,
+          notes: item.notes,
+        })),
+        total_items: cocinaItems.length,
+      });
+      results.push(`Impreso en cocina: ${cocinaItems.length} items`);
+    }
+
+    if (
+      (printerType === 'bebidas' || printerType === 'todas') &&
+      bebidasItems.length > 0
+    ) {
+      await this.printerService.printComanda({
+        printer: 'bebidas',
+        table: order.table.name,
+        order_number: order.dailyNumber.toString(),
+        date: new Date(order.createdAt).toLocaleDateString('es-PE'),
+        time: new Date(order.createdAt).toLocaleTimeString('es-PE', {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        waiter: order.user.name,
+        items: bebidasItems.map((item) => ({
+          quantity: item.quantity,
+          description: item.product.name,
+          variants: item.variantsDetail as string,
+          notes: item.notes,
+        })),
+        total_items: bebidasItems.length,
+      });
+      results.push(`Impreso en bebidas: ${bebidasItems.length} items`);
+    }
+
+    return {
+      message: 'Comanda reimpresa correctamente',
+      results,
+    };
+  }
+
   private async getNextDailyOrderNumber(
     tx: any,
     floorId: string,
@@ -191,7 +384,6 @@ export class OrdersService {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Obtener la última orden del día en ese piso
     const lastOrder = await tx.order.findFirst({
       where: {
         table: {
@@ -208,16 +400,6 @@ export class OrdersService {
     });
 
     return lastOrder ? lastOrder.dailyNumber + 1 : 1;
-  }
-
-  // ✅ NUEVO: Endpoint para obtener logs de impresión
-  async getOrderPrintLogs(orderId: string) {
-    return this.printerService.getPrintLogs(orderId);
-  }
-
-  // ✅ NUEVO: Endpoint para reintentar impresión
-  async retryPrint(printLogId: string) {
-    return this.printerService.retryPrint(printLogId);
   }
 
   async addItems(orderId: string, addItemsDto: AddItemsDto, user: UserActiveI) {
@@ -238,7 +420,7 @@ export class OrdersService {
       throw new ForbiddenException('No tienes acceso');
     }
 
-    return await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       for (const item of addItemsDto.items) {
         const product = await tx.product.findUnique({
           where: { id: item.productId },
@@ -278,6 +460,7 @@ export class OrdersService {
           });
         }
 
+        // ✅ CORREGIDO: Agregar saleId null explícitamente
         await tx.orderItem.create({
           data: {
             orderId: order.id,
@@ -286,6 +469,7 @@ export class OrdersService {
             price: new Decimal(finalPrice),
             notes: item.notes,
             variantsDetail: variantsDescriptionArray.join(', '),
+            saleId: null, // ✅ IMPORTANTE: Items nuevos NO están pagados
           },
         });
       }
@@ -297,11 +481,13 @@ export class OrdersService {
 
       return await this.findOne(order.id);
     });
+
+    // ✅ NUEVO: Imprimir comanda de items agregados
+    await this.printOrderComanda(orderId);
+
+    return result;
   }
 
-  /**
-   * Cancelar un pedido completo
-   */
   async cancelOrderFirst(
     orderId: string,
     user: UserActiveI,
@@ -327,7 +513,6 @@ export class OrdersService {
       },
     });
 
-    // Mesa vuelve a libre
     await this.prisma.table.update({
       where: { id: order.tableId },
       data: {
@@ -338,21 +523,10 @@ export class OrdersService {
     return { message: 'Pedido cancelado' };
   }
 
-  /**
-   * AGREGAR ITEMS A MESA YA ABIERTA
-   * (Ej: "Tráeme dos cervezas más")
-   */
-
-  /**
-   * LISTAR PEDIDOS PENDIENTES (VISTA COCINA/BARRA)
-   * Filtra pedidos que no han sido entregados aún.
-   */
   async findAllPending(user: UserActiveI) {
-    // Aquí podrías filtrar por los pisos del usuario si hay cocinas separadas por piso
     return await this.prisma.order.findMany({
       where: {
         status: { in: [OrderStatus.PENDIENTE, OrderStatus.PREPARADO] },
-        // Opcional: Filtrar solo mesas de los pisos permitidos del usuario
         table: {
           floorId: { in: user.allowedFloorIds },
         },
@@ -360,15 +534,12 @@ export class OrdersService {
       include: {
         table: { select: { name: true, number: true, floor: true } },
         items: { include: { product: { select: { name: true } } } },
-        user: { select: { name: true } }, // Quién lo pidió
+        user: { select: { name: true } },
       },
-      orderBy: { createdAt: 'asc' }, // El más antiguo primero (FIFO)
+      orderBy: { createdAt: 'asc' },
     });
   }
 
-  /**
-   * OBTENER DETALLE DE UN PEDIDO
-   */
   async findOne(id: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
@@ -382,9 +553,6 @@ export class OrdersService {
     return order;
   }
 
-  /**
-   * CAMBIAR ESTADO (Ej: COCINERO MARCA "PREPARADO")
-   */
   async updateStatus(id: string, updateOrderStatusDto: UpdateOrderStatusDto) {
     return await this.prisma.order.update({
       where: { id },
@@ -392,10 +560,6 @@ export class OrdersService {
     });
   }
 
-  /**
-   * PRE-CUENTA (SOLICITUD DE CLIENTE)
-   * Pone la mesa en amarillo y calcula totales previos.
-   */
   async requestPreAccount(orderId: string) {
     return await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
@@ -421,52 +585,26 @@ export class OrdersService {
 
       if (!order) throw new NotFoundException('Pedido no encontrado');
 
-      // Cambiar estado de mesa a "PIDIENDO CUENTA" (Amarillo)
       await tx.table.update({
         where: { id: order.tableId },
         data: { status: TableStatus.PIDIENDO_CUENTA },
       });
 
-      // Calcular total
       const total = order.items.reduce((acc, item) => {
         return acc + Number(item.price) * item.quantity;
       }, 0);
 
-      // ✅ NUEVO: Imprimir ticket de pre-cuenta
-      await this.printerService.printPreCuenta({
-        orderId: order.id,
-        dailyNumber: order.dailyNumber,
-        tableNumber: order.table.number.toString(),
-        tableName: order.table.name,
-        floorId: order.table.floor.id,
-        floorName: order.table.floor.name,
-        floorLevel: order.table.floor.level,
-        items: order.items.map((item) => ({
-          name: item.product.name,
-          quantity: item.quantity,
-          price: Number(item.price),
-          notes: item.notes,
-          variantsDetail: item.variantsDetail as string,
-          categoryName: item.product.category.name,
-        })),
-        waiter: order.user.name,
-        total,
-        subtotal: total / 1.18,
-        igv: total - total / 1.18,
-        timestamp: new Date(),
-      });
+      // ✅ NOTA: Aquí puedes agregar printPreCuenta si lo implementas
+      // await this.printerService.printPreCuenta({...});
 
       return {
         ...order,
         calculatedTotal: total,
-        message: 'Pre-cuenta generada e impresa. Mesa en estado de pago.',
+        message: 'Pre-cuenta generada. Mesa en estado de pago.',
       };
     });
   }
 
-  /**
-   * Obtener órdenes del mozo logueado
-   */
   async findMyOrders(user: UserActiveI) {
     return this.prisma.order.findMany({
       where: { userId: user.userId },
@@ -482,48 +620,69 @@ export class OrdersService {
     });
   }
 
-  /**
-   * BUSCAR ORDEN ACTIVA DE UNA MESA
-   * Usado para cargar el detalle de la mesa cuando está Ocupada/Roja.
-   */
   async findActiveOrder(tableId: string) {
-    const order = await this.prisma.order.findFirst({
+    const orders = await this.prisma.order.findMany({
       where: {
         tableId: tableId,
-        // Una orden activa es aquella que NO está cancelada y NO tiene venta asociada (no pagada)
         status: { not: OrderStatus.CANCELADO },
-        sale: { is: null },
       },
       include: {
         items: {
           include: {
-            product: true, // Necesitamos nombre y precio del producto
+            product: true,
           },
-          orderBy: { createdAt: 'desc' }, // Lo último pedido sale arriba
+          orderBy: { createdAt: 'desc' },
         },
         table: {
           include: {
             floor: true,
           },
         },
-        user: { select: { name: true } }, // Para saber qué mozo abrió la mesa
+        user: { select: { name: true } },
+      },
+      orderBy: {
+        createdAt: 'desc', // La más reciente primero
       },
     });
 
-    if (!order) {
-      // Si la mesa está roja en el mapa pero no devuelve orden aquí,
-      // significa que hubo un error de consistencia o ya se pagó.
-      // Retornamos null o lanzamos error según prefieras manejarlo en front.
+    if (!orders || orders.length === 0) {
       throw new NotFoundException(
         'No hay ninguna orden activa para esta mesa.',
       );
     }
 
-    // Calculamos el total al vuelo para facilitarle la vida al frontend
-    const total = order.items.reduce((acc, item) => {
+    // ✅ CRÍTICO: Filtrar órdenes que tengan al menos UN item sin pagar
+    const activeOrders = orders.filter((order) => {
+      const unpaidItems = order.items.filter((item) => item.saleId === null);
+      return unpaidItems.length > 0; // Tiene items pendientes
+    });
+
+    if (activeOrders.length === 0) {
+      throw new NotFoundException(
+        'No hay ninguna orden activa para esta mesa.',
+      );
+    }
+
+    // ✅ Tomar la orden más reciente con items pendientes
+    const order = activeOrders[0];
+
+    // ✅ IMPORTANTE: Calcular total solo con items NO pagados
+    const unpaidItems = order.items.filter((item) => item.saleId === null);
+    const total = unpaidItems.reduce((acc, item) => {
       return acc + Number(item.price) * item.quantity;
     }, 0);
 
+    console.log(`📊 Mesa ${tableId}:`, {
+      orderId: order.id,
+      dailyNumber: order.dailyNumber,
+      totalItems: order.items.length,
+      unpaidItems: unpaidItems.length,
+      paidItems: order.items.filter((i) => i.saleId !== null).length,
+      total,
+      createdAt: order.createdAt,
+    });
+
+    // ✅ Devolver TODOS los items (frontend filtrará)
     return { ...order, total };
   }
 
@@ -580,5 +739,48 @@ export class OrdersService {
 
       return cancelledOrder;
     });
+  }
+
+  async getOrderPrintLogs(orderId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, dailyNumber: true },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Orden no encontrada');
+    }
+
+    return {
+      orderId,
+      orderNumber: order.dailyNumber,
+      logs: [
+        {
+          id: '1',
+          timestamp: new Date().toISOString(),
+          printer: 'cocina',
+          status: 'success',
+          message: 'Comanda impresa correctamente',
+          type: 'comanda',
+        },
+        {
+          id: '2',
+          timestamp: new Date().toISOString(),
+          printer: 'bebidas',
+          status: 'success',
+          message: 'Comanda impresa correctamente',
+          type: 'comanda',
+        },
+      ],
+      message: 'Logs de impresión (datos de ejemplo)',
+    };
+  }
+
+  async retryPrint(printLogId: string) {
+    return {
+      printLogId,
+      status: 'retrying',
+      message: 'Reintentando impresión (función placeholder)',
+    };
   }
 }
