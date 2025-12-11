@@ -5,18 +5,12 @@ import {
 } from '@nestjs/common';
 import { UserActiveI } from 'src/common/interfaces/userActive.interface';
 import { PrismaService } from 'src/core/prisma/prisma.service';
-import { CreateProductDto } from './dto/create-product.dto';
-import { UpdateProductStockDailyDto } from './dto/update-product-stock.dto';
 
 @Injectable()
 export class CatalogService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Lista categorías visibles según los pisos permitidos del usuario.
-   * Solo devuelve categorías que estén asociadas al menos a uno de los pisos
-   * en user.allowedFloorIds.
-   */
+  // se usa
   async getCategories(user: UserActiveI) {
     if (!user.allowedFloorIds || user.allowedFloorIds.length === 0) {
       throw new BadRequestException(
@@ -24,38 +18,20 @@ export class CatalogService {
       );
     }
 
-    const categories = await this.prisma.category.findMany({
-      where: {
-        floors: {
-          some: {
-            id: {
-              in: user.allowedFloorIds,
-            },
-          },
-        },
-      },
+    const newCategorias = await this.prisma.category.findMany({
       orderBy: {
         name: 'asc',
       },
       include: {
-        children: true,
-        floors: {
-          select: {
-            id: true,
-            name: true,
-            level: true,
-          },
-        },
+        products: true,
+        floors: true,
       },
     });
 
-    return categories;
+    return newCategorias;
   }
 
-  /**
-   * Lista productos visibles según los pisos permitidos del usuario.
-   * Filtra por la relación Category -> floors.
-   */
+  // se usa
   async getProducts(user: UserActiveI) {
     if (!user.allowedFloorIds || user.allowedFloorIds.length === 0) {
       throw new BadRequestException(
@@ -63,22 +39,11 @@ export class CatalogService {
       );
     }
 
-    const products = await this.prisma.product.findMany({
-      where: {
-        isActive: true,
-        category: {
-          floors: {
-            some: {
-              id: {
-                in: user.allowedFloorIds,
-              },
-            },
-          },
-        },
-      },
+    const products2 = await this.prisma.product.findMany({
       orderBy: {
         name: 'asc',
       },
+
       include: {
         variants: true,
         category: {
@@ -91,53 +56,6 @@ export class CatalogService {
       },
     });
 
-    return products;
-  }
-
-  /**
-   * ADMIN: Crear un producto nuevo
-   */
-  async createProduct(createProductDto: CreateProductDto) {
-    const { variants, ...productData } = createProductDto;
-
-    return await this.prisma.product.create({
-      data: {
-        ...productData,
-        variants: {
-          create: variants, // Crea variantes en la misma transacción
-        },
-      },
-    });
-  }
-
-  /**
-   * Actualiza el stockDaily de un producto.
-   * Usado por ADMIN/CAJERO cuando “ya no hay X producto”.
-   */
-  async updateDailyStock(id: string, dto: UpdateProductStockDailyDto) {
-    try {
-      const product = await this.prisma.product.update({
-        where: { id },
-        data: {
-          stockDaily: dto.stockDaily,
-        },
-        select: {
-          id: true,
-          name: true,
-          stockDaily: true,
-          isStockManaged: true,
-        },
-      });
-
-      return product;
-    } catch (error: any) {
-      if (error.code === 'P2025') {
-        throw new NotFoundException('Producto no encontrado.');
-      }
-
-      throw new BadRequestException(
-        'No se pudo actualizar el stock del producto.',
-      );
-    }
+    return products2;
   }
 }

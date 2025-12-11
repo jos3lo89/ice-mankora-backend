@@ -22,12 +22,29 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
+  // se usa
   @AuthAndRoleGuard(Role.MOZO, Role.ADMIN)
   @Post()
   async create(@ActiveUser() user: UserActiveI, @Body() dto: CreateOrderDto) {
-    const result = await this.ordersService.create(dto, user);
+    return await this.ordersService.create(dto, user);
+  }
 
-    return result;
+  // se usa
+  @Post(':id/add-items')
+  @AuthAndRoleGuard(Role.MOZO, Role.ADMIN)
+  addItems2(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() addItemsDto: AddItemsDto,
+    @ActiveUser() user: UserActiveI,
+  ) {
+    return this.ordersService.addItems(id, addItemsDto, user);
+  }
+
+  // se usa
+  @Get('active/:tableId')
+  @AuthAndRoleGuard(Role.MOZO, Role.CAJERO, Role.ADMIN)
+  findActiveByTable(@Param('tableId', ParseUUIDPipe) tableId: string) {
+    return this.ordersService.findActiveOrder(tableId);
   }
 
   @AuthAndRoleGuard(Role.MOZO, Role.ADMIN)
@@ -60,18 +77,6 @@ export class OrdersController {
     return this.ordersService.cancelOrder(orderId, user, dto);
   }
 
-  @Post(':id/add-items')
-  @AuthAndRoleGuard(Role.MOZO, Role.ADMIN)
-  addItems2(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() addItemsDto: AddItemsDto,
-    @ActiveUser() user: UserActiveI,
-  ) {
-    console.log('body:', addItemsDto);
-
-    return this.ordersService.addItems(id, addItemsDto, user);
-  }
-
   @Get('pending')
   @AuthAndRoleGuard(Role.MOZO, Role.ADMIN, Role.CAJERO)
   findAllPending(@ActiveUser() user: UserActiveI) {
@@ -97,12 +102,6 @@ export class OrdersController {
   @AuthAndRoleGuard(Role.MOZO, Role.ADMIN)
   requestPreAccount(@Param('id', ParseUUIDPipe) id: string) {
     return this.ordersService.requestPreAccount(id);
-  }
-
-  @Get('active/:tableId')
-  @AuthAndRoleGuard(Role.MOZO, Role.CAJERO, Role.ADMIN)
-  findActiveByTable(@Param('tableId', ParseUUIDPipe) tableId: string) {
-    return this.ordersService.findActiveOrder(tableId);
   }
 
   /**

@@ -9,7 +9,11 @@ async function bootstrap() {
   app.use(cookieParser());
 
   app.enableCors({
-    origin: ['https://www.evilain.site', 'https://evilain.site'],
+    origin: [
+      'https://www.evilain.site',
+      'https://evilain.site',
+      'https://ice-mankora-frontend.vercel.app',
+    ],
     // origin: true,
     credentials: true,
   });

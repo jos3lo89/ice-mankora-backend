@@ -13,10 +13,7 @@ import { Role } from 'src/common/enums/role.enum';
 @Injectable()
 export class FloorsService {
   constructor(private readonly prisma: PrismaService) {}
-  /**
-   * Devuelve los pisos y sus mesas, filtrados por allowedFloorIds
-   * del usuario (Mapa interactivo de mesas).
-   */
+
   async getFloorsWithTables(user: UserActiveI) {
     const isAdmin = user.role === Role.ADMIN;
 
