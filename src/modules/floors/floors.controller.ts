@@ -10,11 +10,7 @@ import { CreateTableDto } from './dto/create-table.dto';
 export class FloorsController {
   constructor(private readonly floorsService: FloorsService) {}
 
-  /**
-   * GET /floors/tables
-   * Roles: ADMIN, CAJERO, MOZO
-   * Devuelve: Pisos + Mesas (mapa interactivo).
-   */
+  // se usa
   @AuthAndRoleGuard(Role.ADMIN, Role.CAJERO, Role.MOZO)
   @Get('tables')
   getFloorsWithTables(@ActiveUser() user: UserActiveI) {

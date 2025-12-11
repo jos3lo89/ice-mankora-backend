@@ -32,8 +32,8 @@ enum CashMovementType {
 enum TableStatus {
   LIBRE
   OCUPADA
-  PIDIENDO_CUENTA // Mesa amarilla
-  SUCIA // Requiere limpieza antes de asignar
+  PIDIENDO_CUENTA
+  SUCIA
 }
 
 enum OrderStatus {
@@ -487,4 +487,18 @@ model CashMovement {
   updatedAt DateTime @updatedAt
 
   @@map("cash_movements")
+}
+
+enum AreaOrder {
+  COCINA
+  BEBIDAS
+}
+
+model OrderPrintSequence {
+  id         String    @id @default(uuid())
+  area       AreaOrder
+  date       DateTime
+  lastNumber Int       @default(0)
+
+  @@unique([area, date])
 }

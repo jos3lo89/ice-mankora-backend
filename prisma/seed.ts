@@ -13,108 +13,6 @@ const prisma = new PrismaClient({
   adapter,
 });
 
-// const MENU_DATA = [
-//   {
-//     category: 'Entradas',
-//     floorLevel: 1,
-//     items: [
-//       { name: 'Capchi de queso', price: 10.0 },
-//       { name: 'Tequeños', price: 12.0 },
-//       { name: 'Huancaina', price: 10.0 },
-//       { name: 'Ocopa', price: 10.0 },
-//       { name: 'Leche de Tigre', price: 12.0 },
-//       { name: 'Sopa Dieta', price: 15.0 },
-//     ],
-//   },
-//   {
-//     category: 'Platos de Fondo',
-//     floorLevel: 1,
-//     items: [
-//       { name: 'Alitas fritas', price: 20.0 },
-//       { name: 'Pollo brosther', price: 20.0 },
-//       { name: 'Chicken finger', price: 20.0 },
-//       { name: 'Ceviche de tilapia', price: 25.0 },
-//       { name: 'Crispi', price: 25.0 },
-//       { name: 'Milanesa de pollo', price: 28.0 },
-//       { name: 'Pechuga a la parrilla', price: 27.0 },
-//       { name: 'Chicharron andahuaylino', price: 30.0 },
-//       { name: 'Chicharron de Cuy', price: 55.0 },
-//     ],
-//   },
-//   {
-//     category: 'Piqueos & Snacks',
-//     floorLevel: 1,
-//     items: [{ name: 'Hamburguesa', price: 18.0 }],
-//   },
-//   {
-//     category: 'Desayunos',
-//     floorLevel: 1,
-//     items: [
-//       { name: 'Pollo Deshilachado', price: 10.0 },
-//       { name: 'Choripán', price: 10.0 },
-//       { name: 'Pan con milanesa', price: 13.0 },
-//       { name: 'Pan con Chicharron', price: 13.0 },
-//       { name: 'Bowl de frutas', price: 15.0 },
-//       { name: 'Ensalada de frutas', price: 17.0 },
-//     ],
-//   },
-//   {
-//     category: 'Combos',
-//     floorLevel: 1,
-//     items: [
-//       {
-//         name: 'Jugo clásico + panqueques de avena + Ensalada de fruta',
-//         price: 18.0,
-//       },
-//     ],
-//   },
-//   {
-//     category: 'Postres',
-//     floorLevel: 1,
-//     items: [
-//       { name: 'Waffles', price: 20.0 },
-//       { name: 'Waffle burbuja', price: 13.0 },
-//       { name: 'Crepes', price: 20.0 },
-//       { name: 'Brownie', price: 20.0 },
-//       { name: 'Crema Especial (fruta de temporada)', price: 15.0 },
-//       { name: 'Panqueques de avena', price: 18.0 },
-//     ],
-//   },
-//   {
-//     category: 'Helados',
-//     floorLevel: 3,
-//     items: [
-//       { name: 'Copa Clásica', price: 10.0 },
-//       { name: 'Copa experiencia', price: 15.0 },
-//       { name: 'Banana Splite', price: 15.0 },
-//     ],
-//   },
-//   {
-//     category: 'BEBIDAS, JUGOS & REFRESCANTES ',
-//     floorLevel: 3,
-//     items: [
-//       { name: 'Café', price: 4.0 },
-//       { name: 'Infusiones', price: 4.0 },
-//       { name: 'Café Expreso', price: 6.0 },
-//       { name: 'Capuchino', price: 12.0 },
-//       { name: 'Jugos (frutas de temporada)', price: 10.0 },
-//       { name: 'Chicha Morada', price: 12.0 },
-//       { name: 'Maracuyá', price: 12.0 },
-//       { name: 'Limonada', price: 12.0 },
-//     ],
-//   },
-//   {
-//     category: 'Bebidas Frías',
-//     floorLevel: 3,
-//     items: [
-//       { name: 'Soda Italiana', price: 10.0 },
-//       { name: 'Frappe', price: 15.0 },
-//       { name: 'Bubble tea', price: 18.0 },
-//       { name: 'Refrescantes 1L', price: 18.0 },
-//     ],
-//   },
-// ];
-
 const MENU_DATA = [
   // ================================
   //           ENTRADAS
@@ -192,7 +90,7 @@ const MENU_DATA = [
   // ================================
   {
     category: 'Helados Gourmet',
-    floorLevel: 3,
+    floorLevel: 1,
     items: [
       { name: 'Copa Clásica', price: 10.0 },
       { name: 'Banana Split', price: 15.0 },
@@ -332,7 +230,7 @@ const MENU_DATA = [
     items: [
       { name: 'Soda Italiana', price: 10.0 },
       { name: 'Frappe', price: 15.0 },
-      { name: 'Refrescantes 1LT', price: 8.0 },
+      { name: 'Refrescantes 1LT', price: 18.0 },
       { name: 'Refrescante vaso', price: 10.0 },
       { name: 'Mocktail', price: 12.0 },
     ],
