@@ -472,18 +472,53 @@ async function main() {
   console.log('... Creando Mesas');
 
   // Función helper para crear mesas
+  // const createTables = async (
+  //   floorId: string,
+  //   startNum: number,
+  //   count: number,
+  // ) => {
+  //   for (let i = 0; i < count; i++) {
+  //     const num = startNum + i;
+  //     // Upsert basado en la restricción única [floorId, number]
+  //     const existingTable = await prisma.table.findUnique({
+  //       where: {
+  //         floorId_number: {
+  //           floorId: floorId,
+  //           number: num,
+  //         },
+  //       },
+  //     });
+
+  //     if (!existingTable) {
+  //       await prisma.table.create({
+  //         data: {
+  //           number: num,
+  //           name: `Mesa ${num}`,
+  //           floorId: floorId,
+  //           posX: (i % 5) * 100, // Coordenadas dummy para el mapa
+  //           posY: Math.floor(i / 5) * 100,
+  //         },
+  //       });
+  //     }
+  //   }
+  // };
+
+  // await createTables(floor1.id, 1, 10); // Mesas 1-10 en Piso 1
+  // await createTables(floor2.id, 20, 29); // Mesas 1-10 en Piso 2 (Numérico se repite, pero piso es diferente)
+  // await createTables(floor3.id, 30, 39); // Mesas 1-8 en Piso 3
+
+  // Función helper para crear mesas con numeración personalizada
   const createTables = async (
     floorId: string,
     startNum: number,
-    count: number,
+    endNum: number,
   ) => {
-    for (let i = 0; i < count; i++) {
-      const num = startNum + i;
-      // Upsert basado en la restricción única [floorId, number]
+    let i = 0;
+    for (let num = startNum; num <= endNum; num++, i++) {
       const existingTable = await prisma.table.findUnique({
         where: {
           floorId_number: {
-            floorId: floorId,
+            floorId,
             number: num,
           },
         },
@@ -494,8 +529,8 @@ async function main() {
           data: {
             number: num,
             name: `Mesa ${num}`,
-            floorId: floorId,
-            posX: (i % 5) * 100, // Coordenadas dummy para el mapa
+            floorId,
+            posX: (i % 5) * 100, // Coordenadas dummy
             posY: Math.floor(i / 5) * 100,
           },
         });
@@ -503,9 +538,14 @@ async function main() {
     }
   };
 
-  await createTables(floor1.id, 1, 10); // Mesas 1-10 en Piso 1
-  await createTables(floor2.id, 1, 10); // Mesas 1-10 en Piso 2 (Numérico se repite, pero piso es diferente)
-  await createTables(floor3.id, 1, 8); // Mesas 1-8 en Piso 3
+  // Piso 1: mesas 1–10
+  await createTables(floor1.id, 1, 10);
+
+  // Piso 2: mesas 20–29
+  await createTables(floor2.id, 20, 29);
+
+  // Piso 3: mesas 30–39
+  await createTables(floor3.id, 30, 39);
 
   await prisma.systemConfig.upsert({
     where: { key: 'ADMIN_PIN' },
