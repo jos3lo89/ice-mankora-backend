@@ -13,6 +13,7 @@ async function bootstrap() {
       'https://www.evilain.site',
       'https://evilain.site',
       'https://ice-mankora-frontend.vercel.app',
+      'http://localhost:5173',
     ],
     // origin: true,
     credentials: true,
