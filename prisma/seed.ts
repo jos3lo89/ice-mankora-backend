@@ -117,7 +117,7 @@ const MENU_DATA = [
       { name: 'Waffles', price: 20.0 },
       { name: 'Crepes', price: 20.0 },
       { name: 'Brownies', price: 15.0 },
-      { name: 'Fruitys cream', price: 15.0 },
+      { name: 'Fresas con crema', price: 15.0 },
       { name: 'Panques', price: 18.0 },
     ],
   },
