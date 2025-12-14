@@ -11,6 +11,7 @@ import { FloorsModule } from './modules/floors/floors.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { PrinterModule } from './modules/printer/printer.module';
+import { CategoriesModule } from './modules/categories/categories.module';
 
 @Module({
   imports: [
@@ -27,8 +28,9 @@ import { PrinterModule } from './modules/printer/printer.module';
     OrdersModule,
     BillingModule,
     PrinterModule,
+    CategoriesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

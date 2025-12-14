@@ -7,7 +7,7 @@ import {
   ValidateNested,
   Min,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 
 export class CreateProductVariantDto {
   @IsString()
@@ -26,9 +26,10 @@ export class CreateProductDto {
   @IsOptional()
   description?: string;
 
-  @IsNumber()
-  @Min(0)
-  price: number;
+  // @Transform(({ value }) => parseInt(value))
+  @IsString()
+  // @Min(0)
+  price: string;
 
   @IsString()
   categoryId: string;
@@ -50,4 +51,10 @@ export class CreateProductDto {
   @ValidateNested({ each: true })
   @Type(() => CreateProductVariantDto)
   variants?: CreateProductVariantDto[];
+
+
+  @IsBoolean()
+  @IsOptional()
+  isActive: boolean
 }
+

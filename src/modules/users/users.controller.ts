@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { AuthAndRoleGuard } from 'src/common/decorators/auth.decorator';
 import { Role } from 'src/common/enums/role.enum';
@@ -8,7 +8,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
 
   @AuthAndRoleGuard(Role.ADMIN)
   @Get()
@@ -28,5 +28,10 @@ export class UsersController {
     console.log('user', user);
 
     return this.usersService.profile(user.userId);
+  }
+
+  @Get("search-by-dni/:dni")
+  searchByDni(@Param("dni") dni: string) {
+    console.log(dni);
   }
 }

@@ -15,7 +15,6 @@ async function bootstrap() {
       'https://ice-mankora-frontend.vercel.app',
       'http://localhost:5173',
     ],
-    // origin: true,
     credentials: true,
   });
 
