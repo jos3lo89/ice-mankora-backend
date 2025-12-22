@@ -19,7 +19,7 @@ export class OrderItemDto {
 
   @IsString()
   @IsOptional()
-  notes?: string;
+  notes: string;
 
   @IsArray()
   @IsOptional()

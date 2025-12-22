@@ -13,14 +13,12 @@ import {
   SunatStatus,
   TableStatus,
 } from 'src/generated/prisma/enums';
+import { Decimal } from 'src/generated/prisma/internal/prismaNamespace';
 
 @Injectable()
 export class BillingService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * 🔥 PROCESO DE COBRO CON DIVISIÓN DE CUENTA
-   */
   async createSale2(user: UserActiveI, dto: CreateSaleDto) {
     // 1. Validar Pedido
     const order = await this.prisma.order.findUnique({
@@ -36,6 +34,30 @@ export class BillingService {
     if (!order) throw new NotFoundException('Pedido no encontrado');
     if (order.status === OrderStatus.CANCELADO)
       throw new BadRequestException('El pedido está anulado.');
+
+    // ✅ 1.5. VALIDAR QUE EXISTA CAJA ABIERTA HOY
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const openCashRegister = await this.prisma.cashRegister.findFirst({
+      where: {
+        status: 'ABIERTA',
+        openTime: {
+          gte: today,
+          lt: tomorrow,
+        },
+      },
+    });
+
+    if (!openCashRegister) {
+      throw new BadRequestException({
+        message:
+          'No hay caja abierta. Debe abrir la caja para realizar ventas.',
+        code: 'CASH_REGISTER_CLOSED',
+      });
+    }
 
     // ✅ 2. LÓGICA DE DIVISIÓN DE CUENTA
     let itemsToPay = order.items;
@@ -226,6 +248,41 @@ export class BillingService {
         },
       });
 
+      const paymentMethodText = this.getPaymentMethodText(dto.paymentMethod);
+      const comprobanteTipoText = this.getComprobanteTipoText(dto.type);
+      console.log('🔍 Registrando movimiento de caja para venta:', sale.id);
+      console.log('Cash Register ID:', openCashRegister.id);
+      console.log('Total:', total);
+
+      await tx.cashMovement.create({
+        data: {
+          cashRegisterId: openCashRegister.id,
+          amount: new Decimal(total),
+          type: 'INGRESO',
+          description: `Venta ${comprobanteTipoText} ${numeroComprobante} - ${paymentMethodText} - Mesa: ${order.table.name} - Pedido #${order.dailyNumber}`,
+          isAutomatic: true,
+          metadata: {
+            saleId: sale.id,
+            orderId: order.id,
+            tableId: order.tableId,
+            tableName: order.table.name,
+            orderNumber: order.dailyNumber,
+            paymentMethod: dto.paymentMethod,
+            comprobanteTipo: dto.type,
+            numeroComprobante: numeroComprobante,
+            cajeroId: user.userId,
+            cajeroName: cajero.name,
+            mozoId: order.userId,
+            mozoName: order.user.name,
+            clientName: dto.clientName || 'CLIENTE VARIOS',
+            itemsCount: itemsToPay.length,
+            wasSplit: !!dto.itemIds,
+          },
+        },
+      });
+
+      console.log('✅ Movimiento de caja registrado exitosamente');
+
       // ✅ E. VINCULAR ITEMS PAGADOS A ESTA VENTA
       await tx.orderItem.updateMany({
         where: {
@@ -244,7 +301,6 @@ export class BillingService {
       const allPaid = allItems.every((item) => item.saleId !== null);
 
       if (allPaid) {
-        // TODOS LOS ITEMS PAGADOS: Cerrar orden y liberar mesa
         await tx.order.update({
           where: { id: order.id },
           data: { status: OrderStatus.ENTREGADO },
@@ -254,15 +310,44 @@ export class BillingService {
           where: { id: order.tableId },
           data: { status: TableStatus.LIBRE },
         });
-      } else {
-        // PAGO PARCIAL: Mantener orden activa
-        console.log(
-          `✅ Pago parcial: ${itemsToPay.length}/${allItems.length} items pagados`,
-        );
       }
 
-      return sale;
+      return {
+        sale,
+        cashMovement: {
+          cashRegisterId: openCashRegister.id,
+          amount: Number(total),
+          type: 'INGRESO',
+          registered: true,
+        },
+        orderStatus: {
+          allItemsPaid: allPaid,
+          totalItems: allItems.length,
+          paidItems: allItems.filter((item) => item.saleId !== null).length,
+          orderClosed: allPaid,
+        },
+      };
     });
+  }
+
+  private getPaymentMethodText(method: string): string {
+    const methods = {
+      EFECTIVO: 'Efectivo',
+      TARJETA: 'Tarjeta',
+      TRANSFERENCIA: 'Transferencia',
+      YAPE: 'Yape',
+      PLIN: 'Plin',
+    };
+    return methods[method] || method;
+  }
+
+  private getComprobanteTipoText(tipo: ComprobanteType): string {
+    const tipos = {
+      BOLETA: 'Boleta',
+      FACTURA: 'Factura',
+      TICKET: 'Ticket',
+    };
+    return tipos[tipo] || tipo;
   }
 
   /**
@@ -499,81 +584,4 @@ export class BillingService {
     // TODO: Implementar librería 'numero-a-letras' o similar
     return `SON: ${amount.toFixed(2)} SOLES`;
   }
-
-  // async getPrintData(saleId: string) {
-  //   const sale = await this.prisma.sale.findUnique({
-  //     where: { id: saleId },
-  //     include: {
-  //       order: {
-  //         include: {
-  //           items: {
-  //             include: {
-  //               product: true,
-  //             },
-  //           },
-  //           table: true,
-  //           user: true,
-  //         },
-  //       },
-  //       user: true,
-  //     },
-  //   });
-
-  //   if (!sale) {
-  //     throw new NotFoundException('Venta no encontrada');
-  //   }
-
-  //   // Obtener solo los items que pertenecen a esta venta
-  //   const saleItems = sale.order.items.filter(
-  //     (item) => item.saleId === sale.id,
-  //   );
-
-  //   // Formatear datos para impresión
-  //   return {
-  //     company: {
-  //       businessName: sale.businessName,
-  //       ruc: sale.ruc,
-  //       address: sale.address,
-  //     },
-  //     document: {
-  //       type: sale.type,
-  //       number: sale.numeroComprobante,
-  //       date: sale.createdAt,
-  //     },
-  //     order: {
-  //       orderId: sale.order.id,
-  //       orderNumber: sale.order.dailyNumber,
-  //       tableName: sale.order.table.name,
-  //       waiter: sale.order.user.name,
-  //     },
-  //     items: saleItems.map((item) => ({
-  //       quantity: item.quantity,
-  //       description: item.product.name,
-  //       unitPrice: Number(item.price),
-  //       totalItem: Number(item.price) * item.quantity,
-  //       variants: item.variantsDetail,
-  //       notes: item.notes,
-  //     })),
-  //     client: {
-  //       docType: sale.clientDocType,
-  //       docNumber: sale.clientDocNumber,
-  //       name: sale.clientName,
-  //       address: sale.clientAddress,
-  //     },
-  //     totals: {
-  //       subtotal: Number(sale.subtotal),
-  //       igv: Number(sale.igv),
-  //       valorVenta: Number(sale.subtotal),
-  //       precioVentaTotal: Number(sale.precioVentaTotal),
-  //     },
-  //     payment: {
-  //       method: sale.paymentMethod,
-  //       montoPagado: sale.montoPagado ? Number(sale.montoPagado) : undefined,
-  //       vuelto: sale.vuelto ? Number(sale.vuelto) : undefined,
-  //     },
-  //     cashier: {
-  //       name: sale.user.name,
-  //     },
-  //   };
-  // }
 }

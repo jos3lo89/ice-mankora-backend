@@ -49,7 +49,7 @@ export class UsersService {
 
       if (error.code === 'P2002') {
         throw new ConflictException(
-          `Ya existe un usuario con ese ${error.meta.target}.`,
+          'Ya existe un usuario con ese dni o nombre de usuario',
         );
       }
 
