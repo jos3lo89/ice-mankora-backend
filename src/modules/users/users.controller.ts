@@ -8,7 +8,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) { }
+  constructor(private readonly usersService: UsersService) {}
 
   @AuthAndRoleGuard(Role.ADMIN)
   @Get()
@@ -30,8 +30,8 @@ export class UsersController {
     return this.usersService.profile(user.userId);
   }
 
-  @Get("search-by-dni/:dni")
-  searchByDni(@Param("dni") dni: string) {
+  @Get('search-by-dni/:dni')
+  searchByDni(@Param('dni') dni: string) {
     console.log(dni);
   }
 }

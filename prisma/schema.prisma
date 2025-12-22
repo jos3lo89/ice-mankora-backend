@@ -153,13 +153,13 @@ model Floor {
 
 model User {
   id       String   @id @default(uuid())
-  name     String // Nombre completo (Para reportes)
-  dni      String   @unique // Login y Legal
-  username String   @unique // Login rápido (Ej: "JUAN")
-  password String // Hash (bcrypt) del PIN o DNI
+  name     String
+  dni      String   @unique
+  username String   @unique
+  password String
   role     UserRole
 
-  isActive  Boolean  @default(true) // Soft delete
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -474,17 +474,16 @@ model CashRegister {
 }
 
 model CashMovement {
-  id             String       @id @default(uuid())
+  id             String           @id @default(uuid())
   cashRegisterId String
-  cashRegister   CashRegister @relation(fields: [cashRegisterId], references: [id])
-
-  amount      Decimal          @db.Decimal(10, 2)
-  type        CashMovementType
-  description String // Ej: "Compra de leche", "Pago proveedor"
-  isAutomatic Boolean          @default(false) // True si viene de una Venta, False si es manual
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  cashRegister   CashRegister     @relation(fields: [cashRegisterId], references: [id])
+  amount         Decimal          @db.Decimal(10, 2)
+  type           CashMovementType
+  description    String // Ej: "Compra de leche", "Pago proveedor"
+  isAutomatic    Boolean          @default(false) // True si viene de una Venta, False si es manual
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  metadata       Json?
 
   @@map("cash_movements")
 }

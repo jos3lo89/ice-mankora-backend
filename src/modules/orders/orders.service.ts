@@ -142,6 +142,7 @@ export class OrdersService {
         return newOrder;
       });
 
+      // TODO: verificar esto
       this.printOrderToKitchen(order.id);
 
       return order;
@@ -151,6 +152,7 @@ export class OrdersService {
     }
   }
 
+  // se usa
   private async prepareComandaData(orderId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -222,6 +224,7 @@ export class OrdersService {
     return comandaPayload;
   }
 
+  // se usa
   private async printOrderToKitchen(orderId: string) {
     const payload = await this.prepareComandaData(orderId);
 
@@ -305,19 +308,6 @@ export class OrdersService {
           bebidasNumber,
         );
       }
-
-      // const piso = payload.floor_level === 3;
-
-      // await this.printerService.printComanda({
-      //   printer: piso ? 'bebidas' : 'cocina', // <--- Esto le dice a Python que use la IP 192.168.18.36 (según config.json)
-      //   table: payload.table_name,
-      //   order_number: payload.order_number,
-      //   date: payload.date,
-      //   time: payload.time,
-      //   waiter: payload.waiter_name,
-      //   items: itemsParaImpresora,
-      //   total_items: payload.total_items,
-      // });
 
       return { success: true, message: 'Comandas enviadas correctamente' };
     } catch (error) {
@@ -546,11 +536,12 @@ export class OrdersService {
       result.newItemIds,
     );
 
-    // Imprimir SOLO los nuevos items
+    // TODO: verificar aqui
     this.printOrderToKitchenPartial(payload);
 
     return result.order;
   }
+
   private async prepareAddedItemsComanda2(orderId: string, itemIds: string[]) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -1014,57 +1005,5 @@ export class OrdersService {
 
       return cancelledOrder;
     });
-  }
-
-  async getOrderPrintLogs(orderId: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      select: { id: true, dailyNumber: true },
-    });
-
-    if (!order) {
-      throw new NotFoundException('Orden no encontrada');
-    }
-
-    return {
-      orderId,
-      orderNumber: order.dailyNumber,
-      logs: [
-        {
-          id: '1',
-          timestamp: new Date().toISOString(),
-          printer: 'cocina',
-          status: 'success',
-          message: 'Comanda impresa correctamente',
-          type: 'comanda',
-        },
-        {
-          id: '2',
-          timestamp: new Date().toISOString(),
-          printer: 'bebidas',
-          status: 'success',
-          message: 'Comanda impresa correctamente',
-          type: 'comanda',
-        },
-      ],
-      message: 'Logs de impresión (datos de ejemplo)',
-    };
-  }
-
-  async retryPrint(printLogId: string) {
-    return {
-      printLogId,
-      status: 'retrying',
-      message: 'Reintentando impresión (función placeholder)',
-    };
-  }
-
-  async printOrderComanda(orderId: string) {
-    try {
-      const comandaData = await this.prepareComandaData(orderId);
-      console.log('COMANDA DATA ------>>>>>', JSON.stringify(comandaData));
-    } catch (error) {
-      console.error('❌ Error preparando comanda:', error);
-    }
   }
 }

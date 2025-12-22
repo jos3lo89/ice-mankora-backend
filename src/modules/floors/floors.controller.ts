@@ -13,8 +13,14 @@ export class FloorsController {
   // se usa
   @AuthAndRoleGuard(Role.ADMIN, Role.CAJERO, Role.MOZO)
   @Get('tables')
-  getFloorsWithTables(@ActiveUser() user: UserActiveI) {
-    return this.floorsService.getFloorsWithTables(user);
+  getFloorsWithTables() {
+    return this.floorsService.getFloorsWithTables();
+  }
+
+  @AuthAndRoleGuard(Role.ADMIN)
+  @Get('for-user-register')
+  getFloorsForUserRegister() {
+    return this.floorsService.getFloorForUserRegister();
   }
 
   @Post('tables')

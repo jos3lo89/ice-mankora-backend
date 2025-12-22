@@ -1,38 +1,41 @@
 import {
-  BadRequestException,
   ConflictException,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
-import { UserActiveI } from 'src/common/interfaces/userActive.interface';
 import { PrismaService } from 'src/core/prisma/prisma.service';
 import { CreateTableDto } from './dto/create-table.dto';
-import { Role } from 'src/common/enums/role.enum';
 
 @Injectable()
 export class FloorsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getFloorsWithTables(user: UserActiveI) {
-    const isAdmin = user.role === Role.ADMIN;
-
-    if (!user.allowedFloorIds || user.allowedFloorIds.length === 0) {
-      throw new BadRequestException('El usuario no tiene pisos asignados.');
-    }
-
-    const floors = await this.prisma.floor.findMany({
-      where: isAdmin ? {} : { id: { in: user.allowedFloorIds } },
+  // uso fijo
+  async getFloorsWithTables() {
+    const floorsAndTables = await this.prisma.floor.findMany({
       orderBy: { level: 'asc' },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        level: true,
         tables: {
           where: { isActive: true },
           orderBy: { number: 'asc' },
+          select: {
+            id: true,
+            number: true,
+            status: true,
+          },
         },
       },
     });
 
-    return floors;
+    if (!floorsAndTables) {
+      throw new NotFoundException('No se encontro las mesas');
+    }
+
+    return floorsAndTables;
   }
 
   /**
@@ -100,5 +103,21 @@ export class FloorsService {
         'Ocurrió un error inesperado al crear la mesa.',
       );
     }
+  }
+
+  async getFloorForUserRegister() {
+    const floors = await this.prisma.floor.findMany({
+      select: {
+        id: true,
+        name: true,
+        level: true,
+      },
+    });
+
+    if (!floors) {
+      throw new NotFoundException('No se encontraron pisos');
+    }
+
+    return floors;
   }
 }

@@ -53,20 +53,6 @@ export class OrdersController {
     return this.ordersService.findMyOrders(user);
   }
 
-  // ✅ NUEVO: Obtener logs de impresión de una orden
-  @AuthAndRoleGuard(Role.MOZO, Role.CAJERO, Role.ADMIN)
-  @Get(':id/print-logs')
-  getOrderPrintLogs(@Param('id') id: string) {
-    return this.ordersService.getOrderPrintLogs(id);
-  }
-
-  // ✅ NUEVO: Reintentar impresión fallida
-  @AuthAndRoleGuard(Role.CAJERO, Role.ADMIN)
-  @Post('print-logs/:printLogId/retry')
-  retryPrint(@Param('printLogId') printLogId: string) {
-    return this.ordersService.retryPrint(printLogId);
-  }
-
   @AuthAndRoleGuard(Role.CAJERO, Role.ADMIN)
   @Patch(':orderId/cancel')
   cancelOrder(
@@ -104,11 +90,6 @@ export class OrdersController {
     return this.ordersService.requestPreAccount(id);
   }
 
-  /**
-   * ✅ NUEVO: Reimprimir comanda
-   * Query params:
-   * - printer: 'cocina' | 'bebidas' | 'todas'
-   */
   @Post(':id/reprint-comanda')
   reprintComanda(
     @Param('id') id: string,
@@ -118,20 +99,4 @@ export class OrdersController {
 
     return this.ordersService.reprintComanda(id, printer);
   }
-
-  /**
-   * ✅ NUEVO: Verificar estado del servicio de impresión
-   */
-  // @Get('printer/status')
-  // getPrinterServiceStatus() {
-  //   return this.ordersService.getPrinterServiceStatus();
-  // }
-
-  /**
-   * ✅ NUEVO: Obtener configuración de impresoras
-   */
-  // @Get('printer/config')
-  // getPrintersConfig() {
-  //   return this.ordersService.getPrintersConfig();
-  // }
 }

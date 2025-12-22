@@ -12,6 +12,8 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { PrinterModule } from './modules/printer/printer.module';
 import { CategoriesModule } from './modules/categories/categories.module';
+import { CashRegisterModule } from './modules/cash-register/cash-register.module';
+import { ProductsModule } from './modules/products/products.module';
 
 @Module({
   imports: [
@@ -29,6 +31,8 @@ import { CategoriesModule } from './modules/categories/categories.module';
     BillingModule,
     PrinterModule,
     CategoriesModule,
+    CashRegisterModule,
+    ProductsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
