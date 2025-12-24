@@ -29,6 +29,8 @@ export class AuthController {
     })
     res: Response,
   ) {
+    console.log(signinDto);
+
     const { token, userWithoutPassword } =
       await this.authService.signIn(signinDto);
 

@@ -40,17 +40,10 @@ export class OrdersController {
     return this.ordersService.addItems(id, addItemsDto, user);
   }
 
-  // se usa
   @Get('active/:tableId')
   @AuthAndRoleGuard(Role.MOZO, Role.CAJERO, Role.ADMIN)
   findActiveByTable(@Param('tableId', ParseUUIDPipe) tableId: string) {
     return this.ordersService.findActiveOrder(tableId);
-  }
-
-  @AuthAndRoleGuard(Role.MOZO, Role.ADMIN)
-  @Get('mine')
-  findMyOrders(@ActiveUser() user: UserActiveI) {
-    return this.ordersService.findMyOrders(user);
   }
 
   @AuthAndRoleGuard(Role.CAJERO, Role.ADMIN)
@@ -61,18 +54,6 @@ export class OrdersController {
     @Body() dto: CancelOrderDto,
   ) {
     return this.ordersService.cancelOrder(orderId, user, dto);
-  }
-
-  @Get('pending')
-  @AuthAndRoleGuard(Role.MOZO, Role.ADMIN, Role.CAJERO)
-  findAllPending(@ActiveUser() user: UserActiveI) {
-    return this.ordersService.findAllPending(user);
-  }
-
-  @Get(':id')
-  @AuthAndRoleGuard(Role.MOZO, Role.ADMIN, Role.CAJERO)
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.ordersService.findOne(id);
   }
 
   @Patch(':id/status')
@@ -87,16 +68,8 @@ export class OrdersController {
   @Post(':id/pre-count')
   @AuthAndRoleGuard(Role.MOZO, Role.ADMIN)
   requestPreAccount(@Param('id', ParseUUIDPipe) id: string) {
+    console.log('id de cancelar ornden: ', id);
+
     return this.ordersService.requestPreAccount(id);
-  }
-
-  @Post(':id/reprint-comanda')
-  reprintComanda(
-    @Param('id') id: string,
-    @Query('printer') printer: 'cocina' | 'bebidas' | 'todas' = 'todas',
-  ) {
-    console.log(printer, id);
-
-    return this.ordersService.reprintComanda(id, printer);
   }
 }

@@ -10,10 +10,18 @@ import { PrismaService } from 'src/core/prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import type { UserActiveI } from 'src/common/interfaces/userActive.interface';
 import { CancelOrderDto } from './dto/cancel-order.dto';
-import { OrderStatus, TableStatus } from 'src/generated/prisma/enums';
+import {
+  CashMovementType,
+  CashRegisterStatus,
+  OrderStatus,
+  TableStatus,
+} from 'src/generated/prisma/enums';
 import { AddItemsDto } from './dto/add-items.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
-import { Decimal } from 'src/generated/prisma/internal/prismaNamespace';
+import {
+  Decimal,
+  JsonValue,
+} from 'src/generated/prisma/internal/prismaNamespace';
 import { PrinterService } from '../printer/printer.service';
 
 @Injectable()
@@ -23,6 +31,7 @@ export class OrdersService {
     private readonly printerService: PrinterService,
   ) {}
 
+  // se usa
   async create(createOrderDto: CreateOrderDto, user: UserActiveI) {
     const table = await this.prisma.table.findUnique({
       where: {
@@ -59,7 +68,7 @@ export class OrdersService {
           });
 
           if (!product || !product.isActive) {
-            throw new BadRequestException(`Producto inválido`);
+            throw new BadRequestException('Producto inválido');
           }
 
           let finalPrice = Number(product.price);
@@ -142,7 +151,6 @@ export class OrdersService {
         return newOrder;
       });
 
-      // TODO: verificar esto
       this.printOrderToKitchen(order.id);
 
       return order;
@@ -194,14 +202,14 @@ export class OrdersService {
       productName: item.product.name,
       category: item.product.category.name,
       quantity: item.quantity,
-      unitPrice: Number(item.price), // no necesito
-      totalPrice: Number(item.price) * item.quantity, // no necesito
+      unitPrice: Number(item.price),
+      totalPrice: Number(item.price) * item.quantity,
       variants: item.variantsDetail || null,
       notes: item.notes || null,
       floors: item.product.category.floors.map((f) => ({
         id: f.id,
         level: f.level,
-      })), // add hoy
+      })),
     }));
 
     const comandaPayload = {
@@ -233,19 +241,17 @@ export class OrdersService {
       description: item.productName, // Mapeamos productName a description
       variants: item.variants,
       notes: item.notes,
-      floors: item.floors, // add hoy
+      floors: item.floors,
     }));
-
-    // Separar por área
-    const itemsBebidas = itemsParaImpresora.filter((item) =>
-      item.floors.some((f) => f.level === 3),
-    );
 
     const itemsCocina = itemsParaImpresora.filter((item) =>
       item.floors.some((f) => f.level === 1 || f.level === 2),
     );
 
-    // 3. Enviar al PrinterService
+    const itemsBebidas = itemsParaImpresora.filter((item) =>
+      item.floors.some((f) => f.level === 3),
+    );
+
     try {
       if (itemsCocina.length > 0) {
         const cocinaNumber = await this.getNextAreaOrderNumber('COCINA');
@@ -253,7 +259,6 @@ export class OrdersService {
         await this.printerService.printComanda({
           printer: 'cocina',
           table: payload.table_name,
-          // order_number: payload.order_number,
           order_number: cocinaNumber.toString(),
           date: payload.date,
           time: payload.time,
@@ -267,7 +272,6 @@ export class OrdersService {
           JSON.stringify({
             printer: 'cocina',
             table: payload.table_name,
-            // order_number: payload.order_number,
             order_number: cocinaNumber.toString(),
             date: payload.date,
             time: payload.time,
@@ -316,34 +320,33 @@ export class OrdersService {
     }
   }
 
-  private async printOrderToKitchenPartial(payload: any) {
-    console.log('llego a printer');
-
-    const itemsBebidas = payload.items.filter((item: any) =>
+  // se usa
+  private async printOrderToKitchenPartial(payload: {
+    table: string;
+    waiter: string;
+    date: string;
+    time: string;
+    items: {
+      description: string;
+      quantity: number;
+      variants: JsonValue;
+      notes: string | null;
+      floors: number[];
+    }[];
+  }) {
+    const itemsBebidas = payload.items.filter((item) =>
       item.floors.includes(3),
     );
 
     const itemsCocina = payload.items.filter(
-      (item: any) => item.floors.includes(1) || item.floors.includes(2),
+      (item) => item.floors.includes(1) || item.floors.includes(2),
     );
 
-    if (itemsCocina.length > 0) {
-      const cocinaNumber = await this.getNextAreaOrderNumber('COCINA');
+    try {
+      if (itemsCocina.length > 0) {
+        const cocinaNumber = await this.getNextAreaOrderNumber('COCINA');
 
-      await this.printerService.printComanda({
-        printer: 'cocina',
-        table: payload.table,
-        order_number: cocinaNumber,
-        date: payload.date,
-        time: payload.time,
-        waiter: payload.waiter,
-        items: itemsCocina,
-        total_items: itemsCocina.length,
-      });
-
-      console.log(
-        'cocina add items ->',
-        JSON.stringify({
+        await this.printerService.printComanda({
           printer: 'cocina',
           table: payload.table,
           order_number: cocinaNumber,
@@ -352,28 +355,28 @@ export class OrdersService {
           waiter: payload.waiter,
           items: itemsCocina,
           total_items: itemsCocina.length,
-        }),
-        cocinaNumber,
-      );
-    }
+        });
 
-    if (itemsBebidas.length > 0) {
-      const bebidasNumber = await this.getNextAreaOrderNumber('BEBIDAS');
+        console.log(
+          'cocina add items ->',
+          JSON.stringify({
+            printer: 'cocina',
+            table: payload.table,
+            order_number: cocinaNumber,
+            date: payload.date,
+            time: payload.time,
+            waiter: payload.waiter,
+            items: itemsCocina,
+            total_items: itemsCocina.length,
+          }),
+          cocinaNumber,
+        );
+      }
 
-      await this.printerService.printComanda({
-        printer: 'bebidas',
-        order_number: bebidasNumber.toString(),
-        table: payload.table,
-        date: payload.date,
-        time: payload.time,
-        waiter: payload.waiter,
-        items: itemsBebidas,
-        total_items: itemsBebidas.length,
-      });
+      if (itemsBebidas.length > 0) {
+        const bebidasNumber = await this.getNextAreaOrderNumber('BEBIDAS');
 
-      console.log(
-        'bebidas add items ->',
-        JSON.stringify({
+        await this.printerService.printComanda({
           printer: 'bebidas',
           order_number: bebidasNumber.toString(),
           table: payload.table,
@@ -382,12 +385,32 @@ export class OrdersService {
           waiter: payload.waiter,
           items: itemsBebidas,
           total_items: itemsBebidas.length,
-        }),
-        bebidasNumber,
-      );
+        });
+
+        console.log(
+          'bebidas add items ->',
+          JSON.stringify({
+            printer: 'bebidas',
+            order_number: bebidasNumber.toString(),
+            table: payload.table,
+            date: payload.date,
+            time: payload.time,
+            waiter: payload.waiter,
+            items: itemsBebidas,
+            total_items: itemsBebidas.length,
+          }),
+          bebidasNumber,
+        );
+      }
+
+      return { success: true, message: 'Comandas enviadas correctamente' };
+    } catch (error) {
+      console.error('Error imprimiendo comandas:', error);
+      return { success: false, message: 'Error enviando comandas' };
     }
   }
 
+  // se usa
   private async getNextAreaOrderNumber(area: 'COCINA' | 'BEBIDAS') {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -409,6 +432,7 @@ export class OrdersService {
     return sequence.lastNumber;
   }
 
+  // se usa
   private async getNextDailyOrderNumber(
     tx: any,
     floorId: string,
@@ -437,6 +461,7 @@ export class OrdersService {
     return lastOrder ? lastOrder.dailyNumber + 1 : 1;
   }
 
+  // se usa
   async addItems(orderId: string, addItemsDto: AddItemsDto, user: UserActiveI) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
@@ -531,18 +556,18 @@ export class OrdersService {
     });
 
     // --- DESPUÉS DE LA TRANSACCIÓN ---
-    const payload = await this.prepareAddedItemsComanda2(
+    const payload = await this.prepareAddedItemsComanda(
       orderId,
       result.newItemIds,
     );
 
-    // TODO: verificar aqui
     this.printOrderToKitchenPartial(payload);
 
     return result.order;
   }
 
-  private async prepareAddedItemsComanda2(orderId: string, itemIds: string[]) {
+  // se usa
+  private async prepareAddedItemsComanda(orderId: string, itemIds: string[]) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -586,73 +611,7 @@ export class OrdersService {
     };
   }
 
-  private async prepareAddedItemsComanda3(orderId: string, itemIds: string[]) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        items: {
-          where: { id: { in: itemIds } },
-          include: {
-            product: {
-              include: {
-                category: {
-                  include: {
-                    floors: true,
-                  },
-                },
-                variants: true,
-              },
-            },
-          },
-        },
-        table: { include: { floor: true } },
-        user: true,
-      },
-    });
-
-    if (!order) throw new NotFoundException('Orden no encontrada');
-
-    const fecha = new Date(order.createdAt).toLocaleDateString('es-PE');
-    const hora = new Date(order.createdAt).toLocaleTimeString('es-PE', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-
-    // 💥 MUY IMPORTANTE: IDENTICO AL OBJETO 1
-    const items = order.items.map((item) => ({
-      productName: item.product.name,
-      category: item.product.category.name,
-      quantity: item.quantity,
-      unitPrice: Number(item.price),
-      totalPrice: Number(item.price) * item.quantity,
-      variants: item.variantsDetail || null,
-      notes: item.notes || null,
-      floors: item.product.category.floors.map((f) => ({
-        id: f.id,
-        level: f.level,
-      })),
-    }));
-
-    console.log('llego  prepara data');
-
-    return {
-      order_number: order.dailyNumber.toString(),
-      order_id: order.id,
-      table_name: order.table.name,
-      table_number: order.table.number,
-      floor_name: order.table.floor.name,
-      floor_level: order.table.floor.level,
-      waiter_name: order.user.name,
-      waiter_username: order.user.username,
-      date: fecha,
-      time: hora,
-      items,
-      total_items: items.length,
-      total_quantity: items.reduce((sum, item) => sum + item.quantity, 0),
-      total_amount: items.reduce((sum, item) => sum + item.totalPrice, 0),
-    };
-  }
-
+  // se usa
   async findActiveOrder(tableId: string) {
     const orders = await this.prisma.order.findMany({
       where: {
@@ -709,182 +668,7 @@ export class OrdersService {
     return { ...order, total };
   }
 
-  // ------------------------------
-  async reprintComanda(
-    orderId: string,
-    printerType: 'cocina' | 'bebidas' | 'todas',
-  ) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: {
-        items: {
-          include: {
-            product: {
-              include: {
-                category: true,
-              },
-            },
-          },
-        },
-        table: {
-          include: {
-            floor: true,
-          },
-        },
-        user: true,
-      },
-    });
-
-    if (!order) {
-      throw new NotFoundException('Orden no encontrada');
-    }
-
-    const cocinaItems = order.items.filter((item) => {
-      const categoryName = item.product.category.name.toLowerCase();
-      return (
-        categoryName.includes('comida') ||
-        categoryName.includes('plato') ||
-        categoryName.includes('parrilla') ||
-        categoryName.includes('entrada') ||
-        categoryName.includes('postre')
-      );
-    });
-
-    const bebidasItems = order.items.filter((item) => {
-      const categoryName = item.product.category.name.toLowerCase();
-      return (
-        categoryName.includes('bebida') ||
-        categoryName.includes('jugo') ||
-        categoryName.includes('cerveza') ||
-        categoryName.includes('licor') ||
-        categoryName.includes('gaseosa')
-      );
-    });
-
-    const results: any = [];
-
-    // Imprimir según selección
-    if (
-      (printerType === 'cocina' || printerType === 'todas') &&
-      cocinaItems.length > 0
-    ) {
-      await this.printerService.printComanda({
-        printer: 'cocina',
-        table: order.table.name,
-        order_number: order.dailyNumber.toString(),
-        date: new Date(order.createdAt).toLocaleDateString('es-PE'),
-        time: new Date(order.createdAt).toLocaleTimeString('es-PE', {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-        waiter: order.user.name,
-        items: cocinaItems.map((item) => ({
-          quantity: item.quantity,
-          description: item.product.name,
-          variants: item.variantsDetail as string,
-          notes: item.notes,
-        })),
-        total_items: cocinaItems.length,
-      });
-      results.push(`Impreso en cocina: ${cocinaItems.length} items`);
-    }
-
-    if (
-      (printerType === 'bebidas' || printerType === 'todas') &&
-      bebidasItems.length > 0
-    ) {
-      await this.printerService.printComanda({
-        printer: 'bebidas',
-        table: order.table.name,
-        order_number: order.dailyNumber.toString(),
-        date: new Date(order.createdAt).toLocaleDateString('es-PE'),
-        time: new Date(order.createdAt).toLocaleTimeString('es-PE', {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-        waiter: order.user.name,
-        items: bebidasItems.map((item) => ({
-          quantity: item.quantity,
-          description: item.product.name,
-          variants: item.variantsDetail as string,
-          notes: item.notes,
-        })),
-        total_items: bebidasItems.length,
-      });
-      results.push(`Impreso en bebidas: ${bebidasItems.length} items`);
-    }
-
-    return {
-      message: 'Comanda reimpresa correctamente',
-      results,
-    };
-  }
-
-  async cancelOrderFirst(
-    orderId: string,
-    user: UserActiveI,
-    dto: CancelOrderDto,
-  ) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      include: { table: true },
-    });
-
-    if (!order) throw new NotFoundException('Pedido no encontrado.');
-
-    if (!user.allowedFloorIds.includes(order.table.floorId))
-      throw new ForbiddenException('No tienes acceso.');
-
-    if (order.status === 'CANCELADO')
-      throw new ConflictException('El pedido ya estaba cancelado.');
-
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        status: 'CANCELADO',
-      },
-    });
-
-    await this.prisma.table.update({
-      where: { id: order.tableId },
-      data: {
-        status: 'LIBRE',
-      },
-    });
-
-    return { message: 'Pedido cancelado' };
-  }
-
-  async findAllPending(user: UserActiveI) {
-    return await this.prisma.order.findMany({
-      where: {
-        status: { in: [OrderStatus.PENDIENTE, OrderStatus.PREPARADO] },
-        table: {
-          floorId: { in: user.allowedFloorIds },
-        },
-      },
-      include: {
-        table: { select: { name: true, number: true, floor: true } },
-        items: { include: { product: { select: { name: true } } } },
-        user: { select: { name: true } },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
-  }
-
-  async findOne(id: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
-      include: {
-        items: { include: { product: true } },
-        table: { include: { floor: true } },
-        user: true,
-      },
-    });
-    if (!order) throw new NotFoundException(`Order #${id} not found`);
-    return order;
-  }
-
+  // se usa
   async updateStatus(id: string, updateOrderStatusDto: UpdateOrderStatusDto) {
     return await this.prisma.order.update({
       where: { id },
@@ -892,6 +676,7 @@ export class OrdersService {
     });
   }
 
+  // se usa
   async requestPreAccount(orderId: string) {
     return await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
@@ -937,25 +722,15 @@ export class OrdersService {
     });
   }
 
-  async findMyOrders(user: UserActiveI) {
-    return this.prisma.order.findMany({
-      where: { userId: user.userId },
-      include: {
-        items: true,
-        table: {
-          include: {
-            floor: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
+  // se usa
   async cancelOrder(orderId: string, user: UserActiveI, dto: CancelOrderDto) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { table: true, sale: true },
+      include: {
+        table: true,
+        sale: true,
+        items: { include: { product: true } },
+      },
     });
 
     if (!order) {
@@ -984,7 +759,21 @@ export class OrdersService {
       throw new ForbiddenException('Código de autorización incorrecto');
     }
 
+    const cajaAbierta = await this.prisma.cashRegister.findFirst({
+      where: {
+        status: CashRegisterStatus.ABIERTA,
+      },
+      orderBy: {
+        openTime: 'desc',
+      },
+    });
+
+    const totalPedido = order.items.reduce((sum, item) => {
+      return sum + parseFloat(item.price.toString()) * item.quantity;
+    }, 0);
+
     return await this.prisma.$transaction(async (tx) => {
+      // 1. Crear registro de cancelación
       await tx.orderCancellation.create({
         data: {
           orderId: orderId,
@@ -993,15 +782,53 @@ export class OrdersService {
         },
       });
 
+      // 2. Cancelar el pedido
       const cancelledOrder = await tx.order.update({
         where: { id: orderId },
         data: { status: OrderStatus.CANCELADO },
       });
 
+      // 3. Liberar la mesa
       await tx.table.update({
         where: { id: order.tableId },
         data: { status: TableStatus.LIBRE },
       });
+
+      // 4. Registrar movimiento en la caja abierta
+      if (cajaAbierta) {
+        await tx.cashMovement.create({
+          data: {
+            cashRegisterId: cajaAbierta.id,
+            amount: totalPedido,
+            type: CashMovementType.EGRESO,
+            description: `Pedido cancelado - ${order.table.name}`,
+            isAutomatic: true,
+            metadata: {
+              type: 'CANCELACION_PEDIDO',
+              orderId: order.id,
+              orderNumber: order.dailyNumber,
+              tableId: order.tableId,
+              tableName: order.table.name,
+              tableNumber: order.table.number,
+              floorId: order.table.floorId,
+              reason: dto.reason,
+              authorizedBy: user.userId,
+              authorizedByName: user.username,
+              mozeroId: order.userId,
+              itemsCount: order.items.length,
+              items: order.items.map((item) => ({
+                productId: item.productId,
+                productName: item.product.name,
+                quantity: item.quantity,
+                price: parseFloat(item.price.toString()),
+                subtotal: parseFloat(item.price.toString()) * item.quantity,
+              })),
+              totalPedido: totalPedido,
+              cancelledAt: new Date(),
+            },
+          },
+        });
+      }
 
       return cancelledOrder;
     });
