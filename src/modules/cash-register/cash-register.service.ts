@@ -11,7 +11,6 @@ import { CreateManualMovementDto } from './dto/manual-movement.dto';
 export class CashRegisterService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // verificar si hay una caja abierta hoy
   async getTodayOpenCashRegister() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -39,7 +38,6 @@ export class CashRegisterService {
     });
   }
 
-  // abrir caja
   async openCashRegister(userId: string, initialMoney: number) {
     const existingOpen = await this.getTodayOpenCashRegister();
 
@@ -83,7 +81,6 @@ export class CashRegisterService {
     return cashRegister;
   }
 
-  // cerrar caja
   async closeCashRegister(cashRegisterId: string, finalMoney: number) {
     const cashRegister = await this.prisma.cashRegister.findUnique({
       where: {
@@ -144,7 +141,7 @@ export class CashRegisterService {
       },
     };
   }
-  // Calcular dinero según movimientos
+
   private async calculateSystemMoney(cashRegisterId: string): Promise<number> {
     const cashRegister = await this.prisma.cashRegister.findUnique({
       where: { id: cashRegisterId },
@@ -160,19 +157,16 @@ export class CashRegisterService {
     let total = parseFloat(cashRegister.initialMoney.toString());
 
     for (const movement of cashRegister.movements) {
-      // const amount = parseFloat(movement.amount.toString());
-      //
-      // if (movement.type === 'INGRESO') {
-      //   total += amount;
-      // } else if (movement.type === 'EGRESO') {
-      //   total -= amount;
-      // }
-      // Saltar movimiento de apertura si existe
       if ((movement.metadata as any)?.isOpeningMovement) {
         continue;
       }
 
+      if ((movement.metadata as any)?.type === 'CANCELACION_PEDIDO') {
+        continue;
+      }
+
       const amount = parseFloat(movement.amount.toString());
+
       if (movement.type === 'INGRESO') {
         total += amount;
       } else if (movement.type === 'EGRESO') {
@@ -183,7 +177,6 @@ export class CashRegisterService {
     return total;
   }
 
-  // Obtener ventas del día actual
   async getTodaySales(cashRegisterId: string) {
     const cashRegister = await this.prisma.cashRegister.findUnique({
       where: {
@@ -227,7 +220,6 @@ export class CashRegisterService {
     };
   }
 
-  // Obtener resumen diario
   async getDailySummary(cashRegisterId: string) {
     const cashRegister = await this.prisma.cashRegister.findUnique({
       where: { id: cashRegisterId },
@@ -247,34 +239,35 @@ export class CashRegisterService {
 
     const sales = await this.getTodaySales(cashRegisterId);
 
-    console.log('cash register -> ', cashRegister);
-
     const movements = {
       ventas: cashRegister.movements
         .filter(
           (m) =>
             m.type === 'INGRESO' &&
             m.isAutomatic &&
-            !(m.metadata as any)?.isOpeningMovement,
+            !(m.metadata as any)?.isOpeningMovement &&
+            (m.metadata as any)?.type !== 'CANCELACION_PEDIDO',
         )
         .reduce((acc, m) => acc + parseFloat(m.amount.toString()), 0),
       ingresos: cashRegister.movements
-        .filter((m) => m.type === 'INGRESO' && !m.isAutomatic)
+        .filter(
+          (m) =>
+            m.type === 'INGRESO' &&
+            !m.isAutomatic &&
+            (m.metadata as any)?.type !== 'CANCELACION_PEDIDO',
+        )
         .reduce((acc, m) => acc + parseFloat(m.amount.toString()), 0),
       egresos: cashRegister.movements
-        .filter((m) => m.type === 'EGRESO')
+        .filter(
+          (m) =>
+            m.type === 'EGRESO' &&
+            (m.metadata as any)?.type !== 'CANCELACION_PEDIDO',
+        )
         .reduce((acc, m) => acc + parseFloat(m.amount.toString()), 0),
     };
 
     const systemMoney = await this.calculateSystemMoney(cashRegisterId);
 
-    // return {
-    //   cashRegister,
-    //   sales,
-    //   movements,
-    //   systemMoney,
-    //   isOpen: cashRegister.status === 'ABIERTA',
-    // };
     return {
       cashRegister: {
         ...cashRegister,
@@ -303,7 +296,6 @@ export class CashRegisterService {
     };
   }
 
-  // Obtener historial de cajas (últimos 30 días)
   async getCashRegisterHistory(days: number = 30) {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
@@ -513,19 +505,42 @@ export class CashRegisterService {
       },
     });
 
+    // // Separar movimientos por tipo
+    // const ventasAutomaticas = cashRegister.movements.filter(
+    //   (m) =>
+    //     m.type === 'INGRESO' &&
+    //     m.isAutomatic &&
+    //     !(m.metadata as any)?.isOpeningMovement,
+    // );
+
+    // const ingresosExtras = cashRegister.movements.filter(
+    //   (m) => m.type === 'INGRESO' && !m.isAutomatic,
+    // );
+
+    // const egresos = cashRegister.movements.filter((m) => m.type === 'EGRESO');
+
     // Separar movimientos por tipo
     const ventasAutomaticas = cashRegister.movements.filter(
       (m) =>
         m.type === 'INGRESO' &&
         m.isAutomatic &&
-        !(m.metadata as any)?.isOpeningMovement,
+        !(m.metadata as any)?.isOpeningMovement &&
+        (m.metadata as any)?.type !== 'CANCELACION_PEDIDO',
     );
 
     const ingresosExtras = cashRegister.movements.filter(
       (m) => m.type === 'INGRESO' && !m.isAutomatic,
     );
 
-    const egresos = cashRegister.movements.filter((m) => m.type === 'EGRESO');
+    const egresos = cashRegister.movements.filter(
+      (m) =>
+        m.type === 'EGRESO' &&
+        (m.metadata as any)?.type !== 'CANCELACION_PEDIDO',
+    );
+
+    const cancelaciones = cashRegister.movements.filter(
+      (m) => (m.metadata as any)?.type === 'CANCELACION_PEDIDO',
+    );
 
     // Calcular totales
     const totales = {
@@ -663,6 +678,23 @@ export class CashRegisterService {
           ...m,
           amount: parseFloat(m.amount.toString()),
         })),
+        cancelaciones: cancelaciones.map((m) => {
+          const metadata = m.metadata as any;
+          return {
+            id: m.id,
+            orderId: metadata.orderId,
+            orderNumber: metadata.orderNumber,
+            tableName: metadata.tableName,
+            tableNumber: metadata.tableNumber,
+            reason: metadata.reason,
+            authorizedBy: metadata.authorizedByName,
+            itemsCount: metadata.itemsCount,
+            items: metadata.items,
+            totalPedido: metadata.totalPedido,
+            cancelledAt: metadata.cancelledAt,
+            createdAt: m.createdAt,
+          };
+        }),
       },
       estadisticas: {
         ventaPromedio:
@@ -684,6 +716,11 @@ export class CashRegisterService {
                 ...sales.map((s) => parseFloat(s.precioVentaTotal.toString())),
               )
             : 0,
+        totalCancelaciones: cancelaciones.length,
+        montoCancelado: cancelaciones.reduce(
+          (acc, m) => acc + parseFloat(m.amount.toString()),
+          0,
+        ),
       },
     };
   }

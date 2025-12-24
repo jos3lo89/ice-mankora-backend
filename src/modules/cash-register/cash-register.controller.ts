@@ -44,7 +44,10 @@ export class CashRegisterController {
   @AuthAndRoleGuard(Role.MOZO, Role.ADMIN, Role.CAJERO)
   @Get(':id/summary')
   async getDailySummary(@Param('id') id: string) {
-    return this.cashRegisterService.getDailySummary(id);
+    const result = await this.cashRegisterService.getDailySummary(id);
+    console.log('result :id/summary -> ', result);
+
+    return result;
   }
 
   @AuthAndRoleGuard(Role.MOZO, Role.ADMIN, Role.CAJERO)
