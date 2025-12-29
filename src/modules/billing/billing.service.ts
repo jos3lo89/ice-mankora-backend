@@ -32,8 +32,16 @@ export class BillingService {
     });
 
     if (!order) throw new NotFoundException('Pedido no encontrado');
-    if (order.status === OrderStatus.CANCELADO)
+    if (order.status === OrderStatus.CANCELADO) {
       throw new BadRequestException('El pedido está anulado.');
+    }
+
+    // ✅ Verificar que haya items activos
+    if (order.items.length === 0) {
+      throw new BadRequestException(
+        'No hay items activos en el pedido para cobrar.',
+      );
+    }
 
     // ✅ 1.5. VALIDAR QUE EXISTA CAJA ABIERTA HOY
     const today = new Date();
@@ -60,7 +68,12 @@ export class BillingService {
     }
 
     // ✅ 2. LÓGICA DE DIVISIÓN DE CUENTA
-    let itemsToPay = order.items;
+    // ✅ Calcular con items activos para el total
+    let itemsToPay = order.items.filter((item) => item.isActive); // Solo activos para cobrar
+
+    if (dto.itemIds && dto.itemIds.length > 0) {
+      itemsToPay = itemsToPay.filter((item) => dto.itemIds!.includes(item.id));
+    }
 
     if (dto.itemIds && dto.itemIds.length > 0) {
       // PAGO PARCIAL: Solo los items seleccionados
@@ -121,8 +134,11 @@ export class BillingService {
     }
 
     // 5. Cálculos Matemáticos
-    const { baseImponible, igvTotal, itemsSnapshot } =
-      this.calculateTotals(itemsToPay);
+    const allOrderItems = order.items;
+    const { baseImponible, igvTotal, itemsSnapshot } = this.calculateTotals(
+      allOrderItems,
+      true,
+    );
 
     // 6. TRANSACCIÓN
     return await this.prisma.$transaction(async (tx) => {
@@ -295,7 +311,7 @@ export class BillingService {
 
       // ✅ F. VERIFICAR SI TODOS LOS ITEMS ESTÁN PAGADOS
       const allItems = await tx.orderItem.findMany({
-        where: { orderId: order.id },
+        where: { orderId: order.id, isActive: true },
       });
 
       const allPaid = allItems.every((item) => item.saleId !== null);
@@ -535,15 +551,29 @@ export class BillingService {
   /**
    * Helper: Cálculos monetarios precisos
    */
-  private calculateTotals(items: any[]) {
+  private calculateTotals(items: any[], includeInactive: boolean = false) {
+    const itemsForSnapshot = includeInactive
+      ? items
+      : items.filter((item) => item.isActive !== false);
+
+    const activeItems = items.filter((item) => item.isActive !== false);
+
+    if (activeItems.length === 0) {
+      throw new BadRequestException('No hay items activos para calcular.');
+    }
+
     let total = 0;
-    const itemsSnapshot = items.map((item) => {
+
+    const itemsSnapshot = itemsForSnapshot.map((item) => {
       const precioUnitarioConIgv = Number(item.price);
       const subtotalItem = precioUnitarioConIgv * item.quantity;
-      total += subtotalItem;
+
+      // Solo sumar al total si está activo
+      if (item.isActive !== false) {
+        total += subtotalItem;
+      }
 
       const valorUnitario = precioUnitarioConIgv / 1.18;
-      const igvItem = subtotalItem - valorUnitario * item.quantity;
 
       return {
         productId: item.productId,
@@ -552,6 +582,9 @@ export class BillingService {
         precioUnitario: precioUnitarioConIgv,
         valorUnitario: valorUnitario,
         totalItem: subtotalItem,
+        isActive: item.isActive !== false, // ✅ CRÍTICO: Guardar estado
+        notes: item.notes || null,
+        variantsDetail: item.variantsDetail || null,
       };
     });
 
@@ -583,5 +616,155 @@ export class BillingService {
   private numberToLetters(amount: number): string {
     // TODO: Implementar librería 'numero-a-letras' o similar
     return `SON: ${amount.toFixed(2)} SOLES`;
+  }
+
+  async getSaleDetails(saleId: string) {
+    const sale = await this.prisma.sale.findUnique({
+      where: { id: saleId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+          },
+        },
+        client: {
+          select: {
+            id: true,
+            name: true,
+            docType: true,
+            docNumber: true,
+            address: true,
+            email: true,
+          },
+        },
+        order: {
+          include: {
+            table: {
+              include: {
+                floor: true,
+              },
+            },
+            user: {
+              select: {
+                id: true,
+                name: true,
+                username: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!sale) {
+      throw new NotFoundException('Venta no encontrada');
+    }
+
+    // ✅ LEER ITEMS DESDE itemsSnapshot (JSON)
+    const itemsFromSnapshot = (sale.itemsSnapshot as any[]) || [];
+
+    // Separar activos e inactivos
+    const activeItems = itemsFromSnapshot.filter(
+      (item) => item.isActive !== false,
+    );
+    const inactiveItems = itemsFromSnapshot.filter(
+      (item) => item.isActive === false,
+    );
+
+    // Calcular totales
+    const subtotals = {
+      activos: activeItems.reduce(
+        (acc, item) => acc + item.precioUnitario * item.quantity,
+        0,
+      ),
+      inactivos: inactiveItems.reduce(
+        (acc, item) => acc + item.precioUnitario * item.quantity,
+        0,
+      ),
+    };
+
+    return {
+      sale: {
+        id: sale.id,
+        numeroComprobante: sale.numeroComprobante,
+        type: sale.type,
+        serie: sale.serie,
+        correlativo: sale.correlativo,
+        fechaEmision: sale.fechaEmision,
+
+        // Totales
+        montoGravado: parseFloat(sale.montoGravado.toString()),
+        igv: parseFloat(sale.igv.toString()),
+        valorVenta: parseFloat(sale.valorVenta.toString()),
+        precioVentaTotal: parseFloat(sale.precioVentaTotal.toString()),
+
+        // Pago
+        paymentMethod: sale.paymentMethod,
+        formaPago: sale.formaPago,
+        montoPagado: sale.montoPagado,
+        vuelto: sale.vuelto,
+
+        // Estado SUNAT
+        sunatStatus: sale.sunatStatus,
+        xmlFileName: sale.xmlFileName,
+        cdrCode: sale.cdrCode,
+        cdrDescription: sale.cdrDescription,
+
+        // Metadata
+        metadata: sale.metadata,
+
+        // Relaciones
+        cajero: sale.user,
+        cliente: sale.client,
+        orden: sale.order
+          ? {
+              id: sale.order.id,
+              dailyNumber: sale.order.dailyNumber,
+              status: sale.order.status,
+              mesa: {
+                id: sale.order.table.id,
+                name: sale.order.table.name,
+                number: sale.order.table.number,
+                piso: sale.order.table.floor.name,
+              },
+              mozo: sale.order.user,
+            }
+          : null,
+
+        createdAt: sale.createdAt,
+        updatedAt: sale.updatedAt,
+      },
+      items: {
+        activos: activeItems.map((item) => ({
+          productId: item.productId,
+          productName: item.description,
+          quantity: item.quantity,
+          price: item.precioUnitario,
+          subtotal: item.totalItem,
+          notes: item.notes,
+          variantsDetail: item.variantsDetail,
+          isActive: true,
+        })),
+        inactivos: inactiveItems.map((item) => ({
+          productId: item.productId,
+          productName: item.description,
+          quantity: item.quantity,
+          price: item.precioUnitario,
+          subtotal: item.totalItem,
+          notes: item.notes,
+          variantsDetail: item.variantsDetail,
+          isActive: false,
+        })),
+      },
+      totales: {
+        totalActivos: subtotals.activos,
+        totalInactivos: subtotals.inactivos,
+        totalItems: itemsFromSnapshot.length,
+        itemsActivos: activeItems.length,
+        itemsInactivos: inactiveItems.length,
+      },
+    };
   }
 }

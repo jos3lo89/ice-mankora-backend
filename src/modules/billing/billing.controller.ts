@@ -33,7 +33,11 @@ export class BillingController {
   async getPrintData(@Param('id') id: string) {
     const sale = await this.billingService.findOneForPrint(id);
 
-    return {
+    const activeItems = (sale.itemsSnapshot as any[]).filter(
+      (item) => item.isActive !== false,
+    );
+
+    const result = {
       company: {
         ruc: sale.empresaRuc,
         name: sale.empresaRazonSocial,
@@ -52,7 +56,7 @@ export class BillingController {
         docType: sale.clienteTipoDoc,
         address: sale.clienteDireccion,
       },
-      items: sale.itemsSnapshot,
+      items: activeItems,
       totals: {
         subtotal: parseFloat(sale.valorVenta.toString()),
         igv: parseFloat(sale.igv.toString()),
@@ -81,5 +85,15 @@ export class BillingController {
         }),
       },
     };
+
+    console.log(result);
+
+    return result;
+  }
+
+  @Get(':id/details')
+  @AuthAndRoleGuard(Role.CAJERO, Role.ADMIN)
+  async getSaleDetails(@Param('id') id: string) {
+    return this.billingService.getSaleDetails(id);
   }
 }

@@ -68,8 +68,12 @@ export class OrdersController {
   @Post(':id/pre-count')
   @AuthAndRoleGuard(Role.MOZO, Role.ADMIN)
   requestPreAccount(@Param('id', ParseUUIDPipe) id: string) {
-    console.log('id de cancelar ornden: ', id);
-
     return this.ordersService.requestPreAccount(id);
+  }
+
+  @Patch('items/:id/deactivate')
+  @AuthAndRoleGuard(Role.CAJERO, Role.ADMIN, Role.MOZO)
+  deactivateOrderItem(@Param('id') id: string) {
+    return this.ordersService.deactivateOrderItem(id);
   }
 }
