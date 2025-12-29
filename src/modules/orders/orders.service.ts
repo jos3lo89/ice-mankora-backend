@@ -707,15 +707,17 @@ export class OrdersService {
         data: { status: TableStatus.PIDIENDO_CUENTA },
       });
 
-      const total = order.items.reduce((acc, item) => {
+      // Filtrar solo items activos
+      const activeItems = order.items.filter((item) => item.isActive);
+
+      // Calcular total solo con items activos
+      const total = activeItems.reduce((acc, item) => {
         return acc + Number(item.price) * item.quantity;
       }, 0);
 
-      // ✅ NOTA: Aquí puedes agregar printPreCuenta si lo implementas
-      // await this.printerService.printPreCuenta({...});
-
       return {
         ...order,
+        items: activeItems,
         calculatedTotal: total,
         message: 'Pre-cuenta generada. Mesa en estado de pago.',
       };
@@ -832,5 +834,51 @@ export class OrdersService {
 
       return cancelledOrder;
     });
+  }
+
+  async deactivateOrderItem(id: string) {
+    // Verificar que el item existe
+    const orderItem = await this.prisma.orderItem.findUnique({
+      where: { id },
+      include: {
+        order: true,
+      },
+    });
+
+    if (!orderItem) {
+      throw new NotFoundException('Item de orden no encontrado');
+    }
+
+    // Verificar que la orden no esté ya cerrada o cancelada
+    if (
+      orderItem.order.status === 'CANCELADO' ||
+      orderItem.order.status === 'ENTREGADO'
+    ) {
+      throw new BadRequestException(
+        'No se pueden desactivar items de una orden cerrada o cancelada',
+      );
+    }
+
+    // Verificar que el item no esté ya desactivado
+    if (!orderItem.isActive) {
+      throw new BadRequestException('El item ya está desactivado');
+    }
+
+    // Desactivar el item
+    const updatedItem = await this.prisma.orderItem.update({
+      where: { id },
+      data: {
+        isActive: false,
+      },
+      include: {
+        product: true,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Item desactivado correctamente',
+      data: updatedItem,
+    };
   }
 }
