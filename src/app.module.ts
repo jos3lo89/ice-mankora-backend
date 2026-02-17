@@ -14,6 +14,7 @@ import { PrinterModule } from './modules/printer/printer.module';
 import { CategoriesModule } from './modules/categories/categories.module';
 import { CashRegisterModule } from './modules/cash-register/cash-register.module';
 import { ProductsModule } from './modules/products/products.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -33,8 +34,9 @@ import { ProductsModule } from './modules/products/products.module';
     CategoriesModule,
     CashRegisterModule,
     ProductsModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}
